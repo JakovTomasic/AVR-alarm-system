@@ -12,8 +12,11 @@
 #define KEYPAD_PIN 	PINA
 
 #define MOTION_PIN 			PIND
-#define MOTION_PIN_NUMER	0
+#define MOTION_PIN_NUMBER	0
 
+#define BUZZER_DDR 			DDRA
+#define BUZZER_PORT			PORTA
+#define BUZZER_PIN_NUMBER	7
 
 void initLcd() {
 	
@@ -29,7 +32,14 @@ void initLcd() {
 }
 
 uint8_t readMotion() {
-	return bit_is_set(MOTION_PIN, MOTION_PIN_NUMER);
+	return bit_is_set(MOTION_PIN, MOTION_PIN_NUMBER);
+}
+
+void buzz() {
+	BUZZER_DDR |= _BV(BUZZER_PIN_NUMBER);
+	BUZZER_PORT |= _BV(BUZZER_PIN_NUMBER);
+	_delay_ms(100);
+	BUZZER_PORT &= ~(_BV(BUZZER_PIN_NUMBER));
 }
 
 uint8_t getKeyPressed()
@@ -68,11 +78,13 @@ int main(void) {
 	
 	initLcd();
 
+	buzz();
+
 	while (1) {
 		_delay_ms(500);
 		
 		lcd_clrscr();
-		
+
 		lcd_putc('0' + (getKeyPressed() % 10));
 		lcd_gotoxy(0, 1);
 		lcd_putc('0' + (readMotion() % 10));
