@@ -25,14 +25,16 @@ void initLcd() {
 
 uint8_t getKeyPressed()
 {
-	uint8_t r,r2,c;
+	uint8_t r, c, reversedC;
 
 	// Activate pull-up resistor for row pins.
 	// Do not set col pins (assigning zeros would set it)
 	KEYPAD_PORT |= 0X0F;
 
-	for(c = 0; c < 3 ; c++)
+	for(reversedC = 0; reversedC < 3 ; reversedC++)
 	{
+		c = 2 - reversedC;
+		
 		// Set all pins as input (pin 7 is not used so ignore it)
 		KEYPAD_DDR &= 0X80;
 
@@ -41,10 +43,9 @@ uint8_t getKeyPressed()
 		KEYPAD_DDR |= (0X40 >> c);
 		for(r = 0; r < 4; r++)
 		{
-			r2 = 3 - r;
-			if(!(KEYPAD_PIN & (0X08>>r2)))
+			if(!(KEYPAD_PIN & (0X08>>r)))
 			{
-				return (r2*3+c);
+				return (r*3+c);
 			}
 		}
 	}
@@ -57,7 +58,7 @@ uint8_t getKeyPressed()
 int main(void) {
 	
 	initLcd();
-	
+
 	while (1) {
 		_delay_ms(500);
 		
