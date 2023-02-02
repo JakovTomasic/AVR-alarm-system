@@ -3,12 +3,17 @@
 
 #include <avr/io.h>
 #include <util/delay.h>
+#include <stdlib.h>
 
 #include "lcd.h"
 
 #define KEYPAD_PORT PORTA
 #define KEYPAD_DDR 	DDRA
 #define KEYPAD_PIN 	PINA
+
+#define MOTION_PIN 			PIND
+#define MOTION_PIN_NUMER	0
+
 
 void initLcd() {
 	
@@ -21,6 +26,10 @@ void initLcd() {
 	lcd_init(LCD_DISP_ON);
 	lcd_clrscr();
 	lcd_puts("Hello World");
+}
+
+uint8_t readMotion() {
+	return bit_is_set(MOTION_PIN, MOTION_PIN_NUMER);
 }
 
 uint8_t getKeyPressed()
@@ -63,6 +72,9 @@ int main(void) {
 		_delay_ms(500);
 		
 		lcd_clrscr();
+		
 		lcd_putc('0' + (getKeyPressed() % 10));
+		lcd_gotoxy(0, 1);
+		lcd_putc('0' + (readMotion() % 10));
 	}
 }
