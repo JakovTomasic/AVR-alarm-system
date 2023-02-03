@@ -11,19 +11,9 @@
 #define KEYPAD_DDR 			DDRA
 #define KEYPAD_PIN 			PINA
 
-#define KEY_0				11
-#define KEY_1				1
-#define KEY_2				2
-#define KEY_3				3
-#define KEY_4				4
-#define KEY_5				5
-#define KEY_6				6
-#define KEY_7				7
-#define KEY_8				8
-#define KEY_9				9
 #define KEY_STAR			10
-#define KEY_HASH			12
-#define KEY_BASE			16
+#define KEY_HASH			11
+#define KEY_NONE			12
 
 #define MOTION_PIN 			PINA
 #define MOTION_PORT			PORTA
@@ -46,6 +36,12 @@ uint8_t state;
 #define motionDetected (state & 0x40)
 
 
+const uint16_t password = 1234;
+#define PASSWORD_LENGTH 4
+uint8_t enteredDigits[4] = {0, 0, 0, 0};
+
+#define resetEnteredDigits enteredDigits[0] = enteredDigits[1] = enteredDigits[2] = enteredDigits[3] = 0
+#define enteredDigitsValue (enteredDigits[0]*1000 + enteredDigits[1]*100 + enteredDigits[2]*10 + enteredDigits[3])
 
 
 // Utils:
@@ -105,15 +101,28 @@ uint8_t getKeyPressed()
 		{
 			if(keypad_isRowLow(r))
 			{
-				// Return pressed key identifier.
+				// Return pressed key.
 				// Do not check if other keys are pressed.
-				return (r*3+c)+1;
+				if (r < 3) {
+					return (r*3+c)+1;
+				} else if (c == 0) {
+					return KEY_STAR;
+				} else if (c == 1) {
+					return 0;
+				} else {
+					return KEY_HASH;
+				}
 			}
 		}
 	}
 
 	// Indicate no key pressed
-	return 0;
+	return KEY_NONE;
+}
+
+// TODO: make faster using define?
+uint8_t isNumber(uint8_t key) {
+	return key < 10;
 }
 
 
@@ -148,22 +157,36 @@ void refreshState() {
 		} else {
 			lcd_clrscr();
 			lcd_puts("Alarm on");
+			resetEnteredDigits;
 		}
 	} else {
 		lcd_clrscr();
 		lcd_puts("Alarm off");
+		resetEnteredDigits;
 	}
 }
 
 void handleKeypress(uint8_t key) {
-	if (alarmOn && key == KEY_HASH) {
-		state &= 0x7F;
-		state &= 0xBF;
-		refreshState();
-	} else if (!alarmOn && key == KEY_STAR) {
+	if (!alarmOn && key == KEY_STAR) {
 		state |= 0x80;
 		state &= 0xBF;
 		refreshState();
+	} else if (isNumber(key)) {
+		uint8_t i;
+		for (i = 0; i < PASSWORD_LENGTH; i++) {
+			if (!enteredDigits[i]) {
+				enteredDigits[i] = key;
+				break;
+			}
+		}
+		
+		if (i == PASSWORD_LENGTH - 1) {
+			if (alarmOn && enteredDigitsValue == password) {
+				state &= 0x7F;
+				state &= 0xBF;
+				refreshState();
+			}
+		}
 	}
 }
 
@@ -185,7 +208,7 @@ int main(void) {
 
 	buzz();
 
-	uint8_t key, lastKey = 0;
+	uint8_t key, lastKey = KEY_NONE;
 	
 	while (1) {
 		_delay_ms(50);
@@ -201,7 +224,7 @@ int main(void) {
 		lcd_putc('0' + readMotion());
 		*/
 		
-		if (key && key != lastKey) {
+		if (key != KEY_NONE && key != lastKey) {
 			handleKeypress(key);
 			buzz();
 		}
