@@ -25,6 +25,7 @@
 /*
  * b7 -> 1 if alarm turned on, 0 if in deactivated state
  * b6 -> 1 if movement detected, 0 otherwise
+ * b5 -> special action input mode. 1 if active, 0 otherwise
  * other bits -> reserved
  */
 uint8_t state;
@@ -34,10 +35,12 @@ uint8_t state;
 // Warning: do not use these for setting state (fix that)
 #define alarmOn (state & 0x80)
 #define motionDetected (state & 0x40)
+#define specialInputActive (state & 0x20)
 
 
-const uint16_t password = 1234;
 #define PASSWORD_LENGTH 4
+const uint16_t password = 1234;
+
 uint8_t enteredDigits[4] = {KEY_NONE, KEY_NONE, KEY_NONE, KEY_NONE};
 
 #define resetEnteredDigits enteredDigits[0] = enteredDigits[1] = enteredDigits[2] = enteredDigits[3] = KEY_NONE
@@ -160,18 +163,20 @@ void refreshState() {
 			resetEnteredDigits;
 		}
 	} else {
-		lcd_clrscr();
-		lcd_puts("Alarm off");
-		resetEnteredDigits;
+		if (specialInputActive) {
+			lcd_clrscr();
+			lcd_puts("Enter an action");
+			resetEnteredDigits;
+		} else {
+			lcd_clrscr();
+			lcd_puts("Alarm off");
+			resetEnteredDigits;
+		}
 	}
 }
 
 void handleKeypress(uint8_t key) {
-	if (!alarmOn && key == KEY_STAR) {
-		state |= 0x80;
-		state &= 0xBF;
-		refreshState();
-	} else if (alarmOn && key == KEY_HASH) {
+	if (alarmOn && key == KEY_HASH) {
 		lcd_gotoxy(0, 1);
 		lcd_puts("    ");
 		resetEnteredDigits;
@@ -205,6 +210,20 @@ void handleKeypress(uint8_t key) {
 					refreshState();
 				}
 			}
+		}
+	} else if (!alarmOn) {
+		if (specialInputActive) {
+			if (key == 0) {
+				state |= 0x80;
+				state &= 0x9F;
+				refreshState();
+			} else if (key == KEY_STAR) {
+				state &= ~0x20;
+				refreshState();
+			}
+		} else if (key == KEY_STAR) {
+			state |= 0x20;
+			refreshState();
 		}
 	}
 }
