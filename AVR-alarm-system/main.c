@@ -40,7 +40,8 @@ void initLcd() {
 }
 
 uint8_t readMotion() {
-	//MOTION_PORT |= _BV(MOTION_PIN_NUMBER); // TODO: pull-up
+	// Activate pull-up resistor
+	MOTION_PORT |= _BV(MOTION_PIN_NUMBER);
 	return bit_is_set(MOTION_PIN, MOTION_PIN_NUMBER);
 }
 
