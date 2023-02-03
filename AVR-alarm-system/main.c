@@ -7,9 +7,9 @@
 
 #include "lcd.h"
 
-#define KEYPAD_PORT PORTA
-#define KEYPAD_DDR 	DDRA
-#define KEYPAD_PIN 	PINA
+#define KEYPAD_PORT			PORTA
+#define KEYPAD_DDR 			DDRA
+#define KEYPAD_PIN 			PINA
 
 #define MOTION_PIN 			PINA
 #define MOTION_PORT			PORTA
@@ -19,26 +19,25 @@
 #define BUZZER_PORT			PORTC
 #define BUZZER_PIN_NUMBER	7
 
-void initLcd() {
-	
-	DDRD |= _BV(4);
+/*
+ * b7 -> 1 if alarm turned on, 0 if in deactivated state
+ * b6 -> 1 if movement detected, 0 otherwise
+ * other bits -> reserved
+ */
+uint8_t state;
 
-	TCCR1A |= _BV(COM1B1) | _BV(WGM10);
-	TCCR1B |= _BV(WGM12) | _BV(CS11);
-	OCR1B = 128;
+#define DEFAULT_STATE 0x80
 
-	lcd_init(LCD_DISP_ON);
-	lcd_clrscr();
-	lcd_puts("Starting");
-	_delay_ms(200);
-	lcd_putc('.');
-	_delay_ms(200);
-	lcd_putc('.');
-	_delay_ms(200);
-	lcd_putc('.');
-	_delay_ms(200);
-}
+// Warning: do not use these for setting state (fix that)
+#define alarmOn (state & 0x80)
+#define motionDetected (state & 0x40)
 
+
+
+
+// Utils:
+
+// TODO: make faster using define (and activate pull-up resistor only on init)
 uint8_t readMotion() {
 	// Activate pull-up resistor
 	MOTION_PORT |= _BV(MOTION_PIN_NUMBER);
@@ -52,23 +51,27 @@ void buzz() {
 	BUZZER_PORT &= ~(_BV(BUZZER_PIN_NUMBER));
 }
 
+// TODO: make faster using define
 void keypad_activateRowPullUps() {
 	// Do not set col pins (assigning 0 would set it)
 	KEYPAD_PORT |= 0X1E;
 }
 
+// TODO: make faster using define
 void keypad_setAllInput() {
 	// One pin is not used so ignore it
 	KEYPAD_DDR &= 0X01;
 }
 
+// TODO: make faster using define
 void keypad_setColAsOutputLow(uint8_t col) {
 	// PORTX is always 0 for that pins so the output will be low (sink)
 	KEYPAD_DDR |= (0X80 >> col);
 }
 
+// TODO: make faster using define
 uint8_t keypad_isRowLow(uint8_t row) {
-	return !(KEYPAD_PIN & (0X10>>row));
+	return bit_is_clear(KEYPAD_PIN, 4 - row);
 }
 
 uint8_t getKeyPressed()
@@ -101,9 +104,60 @@ uint8_t getKeyPressed()
 }
 
 
+
+// App logic:
+
+void initLcd() {
+	
+	DDRD |= _BV(4);
+
+	TCCR1A |= _BV(COM1B1) | _BV(WGM10);
+	TCCR1B |= _BV(WGM12) | _BV(CS11);
+	OCR1B = 128;
+
+	lcd_init(LCD_DISP_ON);
+	lcd_clrscr();
+	lcd_puts("Starting");
+	_delay_ms(200);
+	lcd_putc('.');
+	_delay_ms(200);
+	lcd_putc('.');
+	_delay_ms(200);
+	lcd_putc('.');
+	_delay_ms(200);
+}
+
+void refreshState() {
+	if (alarmOn) {
+		if (motionDetected) {
+			lcd_clrscr();
+			lcd_puts("I see you moving");
+		} else {
+			lcd_clrscr();
+			lcd_puts("Alarm on");
+		}
+	}
+}
+
+void handleKeypress(uint8_t keyId) {
+	
+}
+
+void checkMotion() {
+	if (alarmOn && !motionDetected && readMotion()) {
+		state |= 0x40;
+		refreshState();
+	}
+}
+
+
+
 int main(void) {
 	
 	initLcd();
+	
+	state = DEFAULT_STATE;
+	refreshState();
 
 	buzz();
 
@@ -111,19 +165,23 @@ int main(void) {
 	
 	while (1) {
 		_delay_ms(50);
-		
-		lcd_clrscr();
 
+		checkMotion();
+
+		/*
 		key = getKeyPressed();
 
+		lcd_clrscr();
 		lcd_putc('0' + (key % 10));
 		lcd_gotoxy(0, 1);
 		lcd_putc('0' + readMotion());
-		
+
 		if (key && key != lastKey) {
+			handleKeypress(key);
 			buzz();
 		}
 		
 		lastKey = key;
+		*/
 	}
 }
