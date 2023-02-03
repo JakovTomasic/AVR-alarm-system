@@ -28,7 +28,14 @@ void initLcd() {
 
 	lcd_init(LCD_DISP_ON);
 	lcd_clrscr();
-	lcd_puts("Hello World");
+	lcd_puts("Starting");
+	_delay_ms(200);
+	lcd_putc('.');
+	_delay_ms(200);
+	lcd_putc('.');
+	_delay_ms(200);
+	lcd_putc('.');
+	_delay_ms(200);
 }
 
 uint8_t readMotion() {
@@ -38,7 +45,7 @@ uint8_t readMotion() {
 void buzz() {
 	BUZZER_DDR |= _BV(BUZZER_PIN_NUMBER);
 	BUZZER_PORT |= _BV(BUZZER_PIN_NUMBER);
-	_delay_ms(100);
+	_delay_ms(200);
 	BUZZER_PORT &= ~(_BV(BUZZER_PIN_NUMBER));
 }
 
@@ -64,13 +71,13 @@ uint8_t getKeyPressed()
 		{
 			if(!(KEYPAD_PIN & (0X08>>r)))
 			{
-				return (r*3+c);
+				return (r*3+c)+1;
 			}
 		}
 	}
 
 	//Indicate No keypressed
-	return 0XFF;
+	return 0;
 }
 
 
@@ -80,13 +87,23 @@ int main(void) {
 
 	buzz();
 
+	uint8_t lastKey = 0;
+
 	while (1) {
-		_delay_ms(500);
+		_delay_ms(50);
 		
 		lcd_clrscr();
 
-		lcd_putc('0' + (getKeyPressed() % 10));
+		uint8_t key = getKeyPressed();
+
+		lcd_putc('0' + (key % 10));
 		lcd_gotoxy(0, 1);
 		lcd_putc('0' + (readMotion() % 10));
+		
+		if (key && key != lastKey) {
+			buzz();
+		}
+		
+		lastKey = key;
 	}
 }
