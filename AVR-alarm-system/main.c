@@ -320,6 +320,7 @@ int main(void) {
 	}
 }
 
+// TODO: do i need this timer? Maybe start it only on motion detect and stop it if correct password entered
 ISR(TIMER1_COMPA_vect)
 {
 	if (alarmOn && motionDetected && !intruderDetected) {
