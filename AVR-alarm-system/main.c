@@ -2,6 +2,7 @@
 # define F_CPU 7372800UL
 
 #include <avr/io.h>
+#include <avr/interrupt.h>
 #include <util/delay.h>
 #include <stdlib.h>
 
@@ -46,8 +47,15 @@ uint8_t enteredDigits[4] = {KEY_NONE, KEY_NONE, KEY_NONE, KEY_NONE};
 #define resetEnteredDigits enteredDigits[0] = enteredDigits[1] = enteredDigits[2] = enteredDigits[3] = KEY_NONE
 #define enteredDigitsValue (enteredDigits[0]*1000 + enteredDigits[1]*100 + enteredDigits[2]*10 + enteredDigits[3])
 
+uint16_t motionDetectionCountdown = 0;
 
 // Utils:
+
+void writeLCD(uint16_t val) {
+	char valStr[16];
+	itoa(val, valStr, 10);
+	lcd_puts(valStr);
+}
 
 // TODO: make faster using define (and activate pull-up resistor only on init)
 uint8_t readMotion() {
@@ -134,12 +142,11 @@ uint8_t isNumber(uint8_t key) {
 
 void initLcd() {
 	
-	DDRD |= _BV(4);
+	DDRB |= _BV(3);
 
-	TCCR1A |= _BV(COM1B1) | _BV(WGM10);
-	TCCR1B |= _BV(WGM12) | _BV(CS11);
-	OCR1B = 128;
-
+	TCCR0 |= _BV(COM01) | _BV(WGM01) | _BV(WGM00) | _BV(CS01);
+	OCR0 = 128;
+	
 	lcd_init(LCD_DISP_ON);
 	lcd_clrscr();
 	lcd_puts("Starting");
@@ -152,7 +159,7 @@ void initLcd() {
 	_delay_ms(200);
 }
 
-void refreshState() {
+void writeCurrentStateMessage() {
 	if (alarmOn) {
 		if (motionDetected) {
 			lcd_clrscr();
@@ -168,17 +175,26 @@ void refreshState() {
 		} else {
 			lcd_clrscr();
 			lcd_puts("Alarm on");
-			resetEnteredDigits;
 		}
 	} else {
 		if (specialInputActive) {
 			lcd_clrscr();
 			lcd_puts("Enter an action");
-			resetEnteredDigits;
 		} else {
 			lcd_clrscr();
 			lcd_puts("Alarm off");
-			resetEnteredDigits;
+		}
+	}
+}
+
+void refreshState() {
+	writeCurrentStateMessage();
+	resetEnteredDigits;
+	if (alarmOn) {
+		if (motionDetected) {
+			motionDetectionCountdown = 6000;
+			lcd_gotoxy(14, 1);
+			lcd_puts("60");
 		}
 	}
 }
@@ -215,7 +231,7 @@ void handleKeypress(uint8_t key) {
 					lcd_puts("Wrong password");
 					_delay_ms(1000);
 					resetEnteredDigits;
-					refreshState();
+					writeCurrentStateMessage();
 				}
 			}
 		}
@@ -256,6 +272,16 @@ int main(void) {
 
 	uint8_t key, lastKey = KEY_NONE;
 	
+	//configure timer 1 - ctc mode, oc1a/b disconnected, prescaler 8
+	//ocr = 9216 -> output compare match f=0.01s
+	TCCR1A = 0;
+	TCCR1B = _BV(WGM12) | _BV(CS11);
+	OCR1A = 9216;
+	//enable OC interrupt
+	TIMSK |= _BV(OCIE1A);
+
+	sei();
+	
 	while (1) {
 		_delay_ms(50);
 
@@ -276,5 +302,15 @@ int main(void) {
 		}
 		
 		lastKey = key;
+	}
+}
+
+ISR(TIMER1_COMPA_vect)
+{
+	if (alarmOn && motionDetected) {
+		if (--motionDetectionCountdown % 100 == 0) {
+			lcd_gotoxy(14, 1);
+			writeLCD(motionDetectionCountdown / 100);
+		}
 	}
 }
