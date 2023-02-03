@@ -157,6 +157,14 @@ void refreshState() {
 		if (motionDetected) {
 			lcd_clrscr();
 			lcd_puts("I see you moving");
+			lcd_gotoxy(0, 1);
+			for (uint8_t i = 0; i < PASSWORD_LENGTH; i++) {
+				if (enteredDigits[i] == KEY_NONE) {
+					break;
+				} else {
+					lcd_putc('0' + enteredDigits[i]);
+				}
+			}
 		} else {
 			lcd_clrscr();
 			lcd_puts("Alarm on");
