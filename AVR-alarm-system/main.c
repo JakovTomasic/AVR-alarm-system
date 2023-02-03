@@ -11,6 +11,20 @@
 #define KEYPAD_DDR 			DDRA
 #define KEYPAD_PIN 			PINA
 
+#define KEY_0				11
+#define KEY_1				1
+#define KEY_2				2
+#define KEY_3				3
+#define KEY_4				4
+#define KEY_5				5
+#define KEY_6				6
+#define KEY_7				7
+#define KEY_8				8
+#define KEY_9				9
+#define KEY_STAR			10
+#define KEY_HASH			12
+#define KEY_BASE			16
+
 #define MOTION_PIN 			PINA
 #define MOTION_PORT			PORTA
 #define MOTION_PIN_NUMBER	0
@@ -18,7 +32,6 @@
 #define BUZZER_DDR 			DDRC
 #define BUZZER_PORT			PORTC
 #define BUZZER_PIN_NUMBER	7
-
 /*
  * b7 -> 1 if alarm turned on, 0 if in deactivated state
  * b6 -> 1 if movement detected, 0 otherwise
@@ -136,11 +149,22 @@ void refreshState() {
 			lcd_clrscr();
 			lcd_puts("Alarm on");
 		}
+	} else {
+		lcd_clrscr();
+		lcd_puts("Alarm off");
 	}
 }
 
-void handleKeypress(uint8_t keyId) {
-	
+void handleKeypress(uint8_t key) {
+	if (alarmOn && key == KEY_HASH) {
+		state &= 0x7F;
+		state &= 0xBF;
+		refreshState();
+	} else if (!alarmOn && key == KEY_STAR) {
+		state |= 0x80;
+		state &= 0xBF;
+		refreshState();
+	}
 }
 
 void checkMotion() {
@@ -168,20 +192,20 @@ int main(void) {
 
 		checkMotion();
 
-		/*
 		key = getKeyPressed();
 
+		/*
 		lcd_clrscr();
 		lcd_putc('0' + (key % 10));
 		lcd_gotoxy(0, 1);
 		lcd_putc('0' + readMotion());
-
+		*/
+		
 		if (key && key != lastKey) {
 			handleKeypress(key);
 			buzz();
 		}
 		
 		lastKey = key;
-		*/
 	}
 }
