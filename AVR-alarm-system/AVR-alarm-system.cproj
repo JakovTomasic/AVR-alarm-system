@@ -46,6 +46,7 @@
     <custom>
       <ToolOptions>
         <InterfaceProperties>
+          <JtagDbgClock>200000</JtagDbgClock>
         </InterfaceProperties>
         <InterfaceName>
         </InterfaceName>
