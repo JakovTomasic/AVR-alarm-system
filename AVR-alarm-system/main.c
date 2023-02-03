@@ -38,9 +38,9 @@ uint8_t state;
 
 const uint16_t password = 1234;
 #define PASSWORD_LENGTH 4
-uint8_t enteredDigits[4] = {0, 0, 0, 0};
+uint8_t enteredDigits[4] = {KEY_NONE, KEY_NONE, KEY_NONE, KEY_NONE};
 
-#define resetEnteredDigits enteredDigits[0] = enteredDigits[1] = enteredDigits[2] = enteredDigits[3] = 0
+#define resetEnteredDigits enteredDigits[0] = enteredDigits[1] = enteredDigits[2] = enteredDigits[3] = KEY_NONE
 #define enteredDigitsValue (enteredDigits[0]*1000 + enteredDigits[1]*100 + enteredDigits[2]*10 + enteredDigits[3])
 
 
@@ -171,20 +171,39 @@ void handleKeypress(uint8_t key) {
 		state |= 0x80;
 		state &= 0xBF;
 		refreshState();
-	} else if (isNumber(key)) {
+	} else if (alarmOn && key == KEY_HASH) {
+		lcd_gotoxy(0, 1);
+		lcd_puts("    ");
+		resetEnteredDigits;
+	} else if (alarmOn && isNumber(key)) {
 		uint8_t i;
+		lcd_gotoxy(0, 1);
+		lcd_puts("    ");
+		lcd_gotoxy(0, 1);
 		for (i = 0; i < PASSWORD_LENGTH; i++) {
-			if (!enteredDigits[i]) {
+			if (enteredDigits[i] == KEY_NONE) {
 				enteredDigits[i] = key;
+				lcd_putc('0' + enteredDigits[i]);
 				break;
+			} else {
+				lcd_putc('0' + enteredDigits[i]);
 			}
 		}
 		
 		if (i == PASSWORD_LENGTH - 1) {
-			if (alarmOn && enteredDigitsValue == password) {
-				state &= 0x7F;
-				state &= 0xBF;
-				refreshState();
+			if (alarmOn) {
+				if (enteredDigitsValue == password) {
+					state &= 0x7F;
+					state &= 0xBF;
+					resetEnteredDigits;
+					refreshState();
+				} else {
+					lcd_clrscr();
+					lcd_puts("Wrong password");
+					_delay_ms(1000);
+					resetEnteredDigits;
+					refreshState();
+				}
 			}
 		}
 	}
