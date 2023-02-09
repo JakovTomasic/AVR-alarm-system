@@ -36,9 +36,7 @@ uint8_t enteredDigits[4] = {KEY_NONE, KEY_NONE, KEY_NONE, KEY_NONE};
 #define resetEnteredDigits enteredDigits[0] = enteredDigits[1] = enteredDigits[2] = enteredDigits[3] = KEY_NONE
 #define enteredDigitsValue (enteredDigits[0]*1000 + enteredDigits[1]*100 + enteredDigits[2]*10 + enteredDigits[3])
 
-// TODO: napravi samo jedan countdown?
-uint16_t motionDetectionCountdown = 0;
-uint16_t policeSwitchCountdown = 0;
+uint16_t tickCounter = 0;
 
 // TODO: izracunaj prave vrijednosti i postavi
 #define SERVO_OPEN_OCR 175
@@ -124,7 +122,7 @@ void refreshState() {
 	writeCurrentStateMessage();
 	if (alarmOn) {
 		if (motionDetected && !intruderDetected) {
-			motionDetectionCountdown = 601; // TODO: set to 6001
+			tickCounter = 601; // TODO: set to 6001
 		} else {
 			resetEnteredDigits;
 		}
@@ -134,6 +132,7 @@ void refreshState() {
 	
 	if (alarmOn && intruderDetected) {
 		OCR1A = SERVO_CLOSED_OCR;
+		tickCounter = 0;
 		startPolice();
 	} else {
 		OCR1A = SERVO_OPEN_OCR;
@@ -202,19 +201,19 @@ void checkMotion() {
 
 void tick() {
 	if (alarmOn && motionDetected && !intruderDetected) {
-		if (--motionDetectionCountdown % 100 == 0) {
+		if (--tickCounter % 100 == 0) {
 			lcd_gotoxy(14, 1);
-			writeLCD_alignRight(motionDetectionCountdown / 100, 2);
+			writeLCD_alignRight(tickCounter / 100, 2);
 		}
 		
-		if (motionDetectionCountdown == 0) {
+		if (tickCounter == 0) {
 			state |= 0x10;
 			refreshState();
 		}
 	} else if (intruderDetected) {
-		if (++policeSwitchCountdown == 100) {
+		if (++tickCounter == 100) {
 			togglePolice();
-			policeSwitchCountdown = 0;
+			tickCounter = 0;
 		}
 	}
 }
