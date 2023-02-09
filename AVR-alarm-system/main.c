@@ -64,23 +64,6 @@ uint16_t policeSwitchCountdown = 0;
 // Utils:
 
 
-
-void tripleBuzz() {
-	// TODO: set ddr before on init
-	BUZZER_DDR |= _BV(BUZZER_PIN_NUMBER);
-	BUZZER_PORT |= _BV(BUZZER_PIN_NUMBER);
-	_delay_ms(65);
-	BUZZER_PORT &= ~(_BV(BUZZER_PIN_NUMBER));
-	_delay_ms(65);
-	BUZZER_PORT |= _BV(BUZZER_PIN_NUMBER);
-	_delay_ms(65);
-	BUZZER_PORT &= ~(_BV(BUZZER_PIN_NUMBER));
-	_delay_ms(65);
-	BUZZER_PORT |= _BV(BUZZER_PIN_NUMBER);
-	_delay_ms(65);
-	BUZZER_PORT &= ~(_BV(BUZZER_PIN_NUMBER));
-}
-
 // TODO: make faster using define
 void keypad_activateRowPullUps() {
 	// Do not set col pins (assigning 0 would set it)
