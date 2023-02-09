@@ -9,10 +9,6 @@
 #define KEY_HASH			11
 #define KEY_NONE			12
 
-#define BUZZER_DDR 			DDRC
-#define BUZZER_PORT			PORTC
-#define BUZZER_PIN_NUMBER	7
-
 #define POLICE_1_DDR 			DDRC
 #define POLICE_1_PORT			PORTC
 #define POLICE_1_PIN_NUMBER		1
@@ -68,13 +64,6 @@ uint16_t policeSwitchCountdown = 0;
 // Utils:
 
 
-void buzz() {
-	// TODO: set ddr before on init
-	BUZZER_DDR |= _BV(BUZZER_PIN_NUMBER);
-	BUZZER_PORT |= _BV(BUZZER_PIN_NUMBER);
-	_delay_ms(200);
-	BUZZER_PORT &= ~(_BV(BUZZER_PIN_NUMBER));
-}
 
 void tripleBuzz() {
 	// TODO: set ddr before on init
@@ -193,10 +182,13 @@ void initServo() {
 	TCCR1B = (1<<WGM12)|(1<<WGM13)|(1<<CS10)|(1<<CS11);
 }
 
+// TODO: make initUtils function in utils
 void init() {
 	
 	// Activate pull-up resistor for motion sensor.
 	MOTION_PORT |= _BV(MOTION_PIN_NUMBER);
+	// Set buzzer DDR
+	BUZZER_DDR |= _BV(BUZZER_PIN_NUMBER);
 	
 	initLcd();
 	initServo();
