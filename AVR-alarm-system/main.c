@@ -51,6 +51,11 @@ uint8_t enteredDigits[4] = {KEY_NONE, KEY_NONE, KEY_NONE, KEY_NONE};
 
 uint16_t motionDetectionCountdown = 0;
 
+// TODO: izracunaj prave vrijednosti i postavi
+#define SERVO_OPEN_OCR 175
+#define SERVO_CLOSED_OCR 300
+
+
 // Utils:
 
 void writeLCD_alignRight(uint16_t val, uint8_t width) {
@@ -172,6 +177,18 @@ void initLcd() {
 	_delay_ms(200);
 }
 
+void initServo() {
+	
+	DDRD |= (1<<PD5);	/* Make OC1A pin as output */
+	TCNT1 = 0;			/* Set timer1 count zero */
+	ICR1 = 2499;		/* Set TOP count for timer1 in ICR1 register */
+	OCR1A = SERVO_OPEN_OCR;
+
+	/* Set Fast PWM, TOP in ICR1, Clear OC1A on compare match, clk/64 */
+	TCCR1A = (1<<WGM11)|(1<<COM1A1);
+	TCCR1B = (1<<WGM12)|(1<<WGM13)|(1<<CS10)|(1<<CS11);
+}
+
 void writeCurrentStateMessage() {
 	if (alarmOn) {
 		if (intruderDetected) {
@@ -215,6 +232,12 @@ void refreshState() {
 		}
 	} else {
 		resetEnteredDigits;
+	}
+	
+	if (alarmOn && intruderDetected) {
+		OCR1A = SERVO_CLOSED_OCR;
+	} else {
+		OCR1A = SERVO_OPEN_OCR;
 	}
 }
 
@@ -276,11 +299,25 @@ void checkMotion() {
 	}
 }
 
+void tick() {
+	if (alarmOn && motionDetected && !intruderDetected) {
+		if (--motionDetectionCountdown % 100 == 0) {
+			lcd_gotoxy(14, 1);
+			writeLCD_alignRight(motionDetectionCountdown / 100, 2);
+		}
+		
+		if (motionDetectionCountdown == 0) {
+			state |= 0x10;
+			refreshState();
+		}
+	}
+}
 
 
 int main(void) {
 	
 	initLcd();
+	initServo();
 
 	state = DEFAULT_STATE;
 	refreshState();
@@ -289,6 +326,8 @@ int main(void) {
 
 	uint8_t key, lastKey = KEY_NONE;
 	
+	
+	/*
 	//configure timer 1 - ctc mode, oc1a/b disconnected, prescaler 8
 	//ocr = 9216 -> output compare match f=0.01s
 	TCCR1A = 0;
@@ -298,9 +337,11 @@ int main(void) {
 	TIMSK |= _BV(OCIE1A);
 
 	sei();
+	*/
+	
 	
 	while (1) {
-		_delay_ms(50);
+		_delay_ms(10);
 
 		checkMotion();
 
@@ -319,21 +360,8 @@ int main(void) {
 		}
 		
 		lastKey = key;
+		
+		tick();
 	}
 }
 
-// TODO: do i need this timer? Maybe start it only on motion detect and stop it if correct password entered
-ISR(TIMER1_COMPA_vect)
-{
-	if (alarmOn && motionDetected && !intruderDetected) {
-		if (--motionDetectionCountdown % 100 == 0) {
-			lcd_gotoxy(14, 1);
-			writeLCD_alignRight(motionDetectionCountdown / 100, 2);
-		}
-		
-		if (motionDetectionCountdown == 0) {
-			state |= 0x10;
-			refreshState();
-		}
-	}
-}
