@@ -161,6 +161,9 @@
     </ToolchainSettings>
   </PropertyGroup>
   <ItemGroup>
+    <Compile Include="cpu_freq.h">
+      <SubType>compile</SubType>
+    </Compile>
     <Compile Include="door.c">
       <SubType>compile</SubType>
     </Compile>

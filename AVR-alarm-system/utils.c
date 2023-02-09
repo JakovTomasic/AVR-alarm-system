@@ -1,4 +1,6 @@
 
+#include "cpu_freq.h"
+
 #include <avr/io.h>
 #include <util/delay.h>
 

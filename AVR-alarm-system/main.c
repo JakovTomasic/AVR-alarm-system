@@ -1,5 +1,5 @@
 
-# define F_CPU 7372800UL
+#include "cpu_freq.h"
 
 #include <avr/io.h>
 #include <avr/interrupt.h>
@@ -16,6 +16,7 @@
  * b6 -> 1 if movement detected, 0 otherwise
  * b5 -> special action input mode. 1 if active, 0 otherwise
  * b4 -> 1 if intruder detected, 0 otherwise
+ * b3 -> 1 if alarm is being turned on (countdown active), 0 otherwise
  * other bits -> reserved
  */
 uint8_t state;
@@ -27,6 +28,7 @@ uint8_t state;
 #define motionDetected (state & 0x40)
 #define specialInputActive (state & 0x20)
 #define intruderDetected (state & 0x10)
+#define alarmTurningOn (state & 0x08)
 
 
 #define PASSWORD_LENGTH 4
@@ -41,6 +43,7 @@ uint16_t tickCounter = 0;
 
 // TODO: set to 6000
 #define MOTION_DETECTED_COUNTDOWN 600
+#define ALARM_TURN_ON_COUNTDOWN 600
 
 
 void initLcd() {
@@ -56,6 +59,21 @@ void initLcd() {
 	_delay_ms(200);
 }
 
+void LCDwriteEnteredDigits() {
+	for (uint8_t i = 0; i < PASSWORD_LENGTH; i++) {
+		if (enteredDigits[i] == KEY_NONE) {
+			break;
+		} else {
+			lcd_putc('0' + enteredDigits[i]);
+		}
+	}
+}
+
+void LcdWriteTickCountdown() {
+	lcd_gotoxy(14, 1);
+	writeLCD_alignRight(tickCounter / 100, 2);
+}
+
 void writeCurrentStateMessage() {
 	if (alarmOn) {
 		if (intruderDetected) {
@@ -67,17 +85,18 @@ void writeCurrentStateMessage() {
 			lcd_clrscr();
 			lcd_puts("I see you moving");
 			lcd_gotoxy(0, 1);
-			for (uint8_t i = 0; i < PASSWORD_LENGTH; i++) {
-				if (enteredDigits[i] == KEY_NONE) {
-					break;
-				} else {
-					lcd_putc('0' + enteredDigits[i]);
-				}
-			}
+			LCDwriteEnteredDigits();
+			LcdWriteTickCountdown();
 		} else {
 			lcd_clrscr();
 			lcd_puts("Alarm on");
 		}
+	} else if (alarmTurningOn) {
+		lcd_clrscr();
+		lcd_puts("Alarm turning on");
+		lcd_gotoxy(0, 1);
+		LCDwriteEnteredDigits();
+		LcdWriteTickCountdown();
 	} else {
 		if (specialInputActive) {
 			lcd_clrscr();
@@ -97,6 +116,8 @@ void refreshState() {
 		} else {
 			resetEnteredDigits;
 		}
+	} else if (alarmTurningOn) {
+		tickCounter = ALARM_TURN_ON_COUNTDOWN + 1;
 	} else {
 		resetEnteredDigits;
 	}
@@ -112,11 +133,11 @@ void refreshState() {
 }
 
 void handleKeypress(uint8_t key) {
-	if (alarmOn && !intruderDetected && key == KEY_HASH) {
+	if (key == KEY_HASH && ((alarmOn && !intruderDetected) || (!alarmOn && alarmTurningOn))) {
 		lcd_gotoxy(0, 1);
 		lcd_puts("    ");
 		resetEnteredDigits;
-	} else if (alarmOn && !intruderDetected && isNumber(key)) {
+	} else if (isNumber(key) && ((alarmOn && !intruderDetected) || (!alarmOn && alarmTurningOn))) {
 		uint8_t i;
 		lcd_gotoxy(0, 1);
 		lcd_puts("    ");
@@ -135,13 +156,14 @@ void handleKeypress(uint8_t key) {
 			if (enteredDigitsValue == password) {
 				state &= 0x7F;
 				state &= 0xBF;
+				state &= 0xF7;
 				resetEnteredDigits;
 				refreshState();
 			} else {
 				lcd_clrscr();
 				lcd_puts("Wrong password");
 				tripleBuzz();
-				_delay_ms(500);
+				_delay_ms(1000);
 				resetEnteredDigits;
 				writeCurrentStateMessage();
 			}
@@ -149,9 +171,20 @@ void handleKeypress(uint8_t key) {
 	} else if (!alarmOn) {
 		if (specialInputActive) {
 			if (key == 0) {
-				state |= 0x80;
-				state &= 0x9F;
-				refreshState();
+				state &= ~0x20;
+				if (motionDetected) {
+					lcd_clrscr();
+					lcd_puts("Movement error!");
+					lcd_gotoxy(0, 1);
+					lcd_puts("Stand still!");
+					tripleBuzz();
+					_delay_ms(1000);
+					writeCurrentStateMessage();
+				} else {
+					state |= 0x08;
+					state &= 0x9F;
+					refreshState();
+				}
 			} else if (key == KEY_STAR) {
 				state &= ~0x20;
 				refreshState();
@@ -163,24 +196,40 @@ void handleKeypress(uint8_t key) {
 	}
 }
 
-void checkMotion() {
-	if (alarmOn && !motionDetected && readMotion()) {
+void updateMotion() {
+	uint8_t motion = readMotion();
+	if (!motionDetected && motion) {
 		state |= 0x40;
-		refreshState();
+		if (alarmOn) {
+			refreshState();
+		}
+	} else if (motionDetected && !motion && !alarmOn) {
+		// Set motion detected back to false only if alarm is not on
+		state &= ~0x40;
 	}
 }
 
 void tick() {
 	if (alarmOn && motionDetected && !intruderDetected) {
-		if (--tickCounter % 100 == 0) {
-			lcd_gotoxy(14, 1);
-			writeLCD_alignRight(tickCounter / 100, 2);
-			buzz();
-		}
+		tickCounter--;
 		
 		if (tickCounter == 0) {
 			state |= 0x10;
 			refreshState();
+		} else if (tickCounter % 100 == 0) {
+			LcdWriteTickCountdown();
+			buzz();
+		}
+	} else if (!alarmOn && alarmTurningOn) {
+		tickCounter--;
+		
+		if (tickCounter == 0) {
+			tripleBuzz();
+			state |= 0x80;
+			refreshState();
+		} else if (tickCounter % 100 == 0) {
+			LcdWriteTickCountdown();
+			buzz();
 		}
 	} else if (intruderDetected) {
 		if (++tickCounter == 100) {
@@ -224,7 +273,7 @@ int main(void) {
 	while (1) {
 		_delay_ms(10);
 
-		checkMotion();
+		updateMotion();
 
 		key = getKeyPressed();
 
