@@ -23,6 +23,15 @@
 #define BUZZER_DDR 			DDRC
 #define BUZZER_PORT			PORTC
 #define BUZZER_PIN_NUMBER	7
+
+#define POLICE_1_DDR 			DDRC
+#define POLICE_1_PORT			PORTC
+#define POLICE_1_PIN_NUMBER		1
+
+#define POLICE_2_DDR 			DDRC
+#define POLICE_2_PORT			PORTC
+#define POLICE_2_PIN_NUMBER		6
+
 /*
  * b7 -> 1 if alarm turned on, 0 if in deactivated state
  * b6 -> 1 if movement detected, 0 otherwise
@@ -49,7 +58,9 @@ uint8_t enteredDigits[4] = {KEY_NONE, KEY_NONE, KEY_NONE, KEY_NONE};
 #define resetEnteredDigits enteredDigits[0] = enteredDigits[1] = enteredDigits[2] = enteredDigits[3] = KEY_NONE
 #define enteredDigitsValue (enteredDigits[0]*1000 + enteredDigits[1]*100 + enteredDigits[2]*10 + enteredDigits[3])
 
+// TODO: napravi samo jedan countdown?
 uint16_t motionDetectionCountdown = 0;
+uint16_t policeSwitchCountdown = 0;
 
 // TODO: izracunaj prave vrijednosti i postavi
 #define SERVO_OPEN_OCR 175
@@ -85,6 +96,22 @@ void buzz() {
 	BUZZER_DDR |= _BV(BUZZER_PIN_NUMBER);
 	BUZZER_PORT |= _BV(BUZZER_PIN_NUMBER);
 	_delay_ms(200);
+	BUZZER_PORT &= ~(_BV(BUZZER_PIN_NUMBER));
+}
+
+void tripleBuzz() {
+	// TODO: set ddr before on init
+	BUZZER_DDR |= _BV(BUZZER_PIN_NUMBER);
+	BUZZER_PORT |= _BV(BUZZER_PIN_NUMBER);
+	_delay_ms(65);
+	BUZZER_PORT &= ~(_BV(BUZZER_PIN_NUMBER));
+	_delay_ms(65);
+	BUZZER_PORT |= _BV(BUZZER_PIN_NUMBER);
+	_delay_ms(65);
+	BUZZER_PORT &= ~(_BV(BUZZER_PIN_NUMBER));
+	_delay_ms(65);
+	BUZZER_PORT |= _BV(BUZZER_PIN_NUMBER);
+	_delay_ms(65);
 	BUZZER_PORT &= ~(_BV(BUZZER_PIN_NUMBER));
 }
 
@@ -267,10 +294,11 @@ void handleKeypress(uint8_t key) {
 				state &= 0xBF;
 				resetEnteredDigits;
 				refreshState();
-				} else {
+			} else {
 				lcd_clrscr();
 				lcd_puts("Wrong password");
-				_delay_ms(1000);
+				tripleBuzz();
+				_delay_ms(500);
 				resetEnteredDigits;
 				writeCurrentStateMessage();
 			}
@@ -310,6 +338,25 @@ void tick() {
 			state |= 0x10;
 			refreshState();
 		}
+	} else if (intruderDetected) {
+		if (policeSwitchCountdown == 0) {
+			// TODO: set ddr before on init
+			POLICE_1_DDR |= _BV(POLICE_1_PIN_NUMBER);
+			POLICE_2_DDR |= _BV(POLICE_2_PIN_NUMBER);
+			
+			POLICE_1_PORT |= _BV(POLICE_1_PIN_NUMBER);
+			POLICE_2_PORT &= ~_BV(POLICE_2_PIN_NUMBER);
+		} else if (policeSwitchCountdown == 100) {
+			// TODO: set ddr before on init
+			POLICE_1_DDR |= _BV(POLICE_1_PIN_NUMBER);
+			POLICE_2_DDR |= _BV(POLICE_2_PIN_NUMBER);
+			
+			POLICE_2_PORT |= _BV(POLICE_2_PIN_NUMBER);
+			POLICE_1_PORT &= ~_BV(POLICE_1_PIN_NUMBER);
+		}
+		
+		policeSwitchCountdown++;
+		policeSwitchCountdown %= 200;
 	}
 }
 
