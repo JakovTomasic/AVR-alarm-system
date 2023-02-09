@@ -19,16 +19,25 @@
  * b3 -> 1 if alarm is being turned on (countdown active), 0 otherwise
  * other bits -> reserved
  */
-uint8_t state;
+typedef struct {
+	uint8_t bit7:1;
+	uint8_t bit6:1;
+	uint8_t bit5:1;
+	uint8_t bit4:1;
+	uint8_t bit3:1;
+} stateRegBits;
+
+//use one of otherwise unused SFRs as states register, for instance TWBR
+//enables usage of sbi/cbi instructions - compiler produces small and fast code
+#define stateReg TWBR
+
+#define alarmOn ((volatile stateRegBits*)_SFR_MEM_ADDR(stateReg))->bit7
+#define motionDetected ((volatile stateRegBits*)_SFR_MEM_ADDR(stateReg))->bit6
+#define specialInputActive ((volatile stateRegBits*)_SFR_MEM_ADDR(stateReg))->bit5
+#define intruderDetected ((volatile stateRegBits*)_SFR_MEM_ADDR(stateReg))->bit4
+#define alarmTurningOn ((volatile stateRegBits*)_SFR_MEM_ADDR(stateReg))->bit3
 
 #define DEFAULT_STATE 0
-
-// Warning: do not use these for setting state (fix that)
-#define alarmOn (state & 0x80)
-#define motionDetected (state & 0x40)
-#define specialInputActive (state & 0x20)
-#define intruderDetected (state & 0x10)
-#define alarmTurningOn (state & 0x08)
 
 
 #define PASSWORD_LENGTH 4
@@ -162,10 +171,10 @@ void handleKeypress(uint8_t key) {
 		
 		if (i == PASSWORD_LENGTH - 1) {
 			if (enteredDigitsValue == password) {
-				state &= 0x7F;
-				state &= 0xBF;
-				state &= 0xEF;
-				state &= 0xF7;
+				alarmOn = 0;
+				motionDetected = 0;
+				intruderDetected = 0;
+				alarmTurningOn = 0;
 				resetEnteredDigits;
 				refreshState();
 			} else {
@@ -180,7 +189,7 @@ void handleKeypress(uint8_t key) {
 	} else if (!alarmOn) {
 		if (specialInputActive) {
 			if (key == 0) {
-				state &= ~0x20;
+				specialInputActive = 0;
 				if (motionDetected) {
 					lcd_clrscr();
 					lcd_puts("Movement error!");
@@ -190,16 +199,16 @@ void handleKeypress(uint8_t key) {
 					_delay_ms(1000);
 					writeCurrentStateMessage();
 				} else {
-					state |= 0x08;
-					state &= 0x9F;
+					alarmTurningOn = 1;
 					refreshState();
 				}
 			} else if (key == KEY_STAR) {
-				state &= ~0x20;
+				specialInputActive = 0;
 				refreshState();
 			}
 		} else if (key == KEY_STAR) {
-			state |= 0x20;
+			
+			specialInputActive = 1;
 			refreshState();
 		}
 	}
@@ -208,13 +217,13 @@ void handleKeypress(uint8_t key) {
 void updateMotion() {
 	uint8_t motion = readMotion();
 	if (!motionDetected && motion) {
-		state |= 0x40;
+		motionDetected = 1;
 		if (alarmOn) {
 			refreshState();
 		}
 	} else if (motionDetected && !motion && !alarmOn) {
 		// Set motion detected back to false only if alarm is not on
-		state &= ~0x40;
+		motionDetected = 0;
 	}
 }
 
@@ -223,7 +232,7 @@ void tick() {
 		tickCounter--;
 		
 		if (tickCounter == 0) {
-			state |= 0x10;
+			intruderDetected = 1;
 			refreshState();
 		} else if (tickCounter % 100 == 0) {
 			LcdWriteTickCountdown();
@@ -234,7 +243,7 @@ void tick() {
 		
 		if (tickCounter == 0) {
 			tripleBuzz();
-			state |= 0x80;
+			alarmOn = 1;
 			refreshState();
 		} else if (tickCounter % 100 == 0) {
 			LcdWriteTickCountdown();
@@ -253,7 +262,7 @@ void init() {
 	initLcd();
 	initDoor();
 	
-	state = DEFAULT_STATE;
+	stateReg = DEFAULT_STATE;
 	refreshState();
 }
 
