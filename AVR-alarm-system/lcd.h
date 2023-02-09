@@ -255,6 +255,14 @@ extern void lcd_command(uint8_t cmd);
 */
 extern void lcd_data(uint8_t data);
 
+/**
+ @brief    Print number in given width, aligned right. 
+ 
+ @param    number to write and width to align right in
+ @return   none
+*/
+extern void writeLCD_alignRight(uint16_t val, const uint8_t width);
+
 
 /**
  @brief macros for automatically storing string constant in program memory

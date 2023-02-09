@@ -511,6 +511,27 @@ void lcd_puts_p(const char *progmem_s)
 
 
 /*************************************************************************
+Display number inside given width space.
+If the number has less digits than given width then the number will 
+be aligned right and left padding from the number will be filled with spaces.
+Input:     string from program memory be be displayed
+Returns:   none
+*************************************************************************/
+void writeLCD_alignRight(uint16_t val, const uint8_t width) {
+	char valStr[width+1];
+	for (uint8_t i = 1; i <= width; i++) {
+		if (val) {
+			valStr[width - i] = '0' + (val % 10);
+			val /= 10;
+		} else {
+			valStr[width - i] = ' ';
+		}
+	}
+	valStr[width] = '\0';
+	lcd_puts(valStr);
+}
+
+/*************************************************************************
 Initialize display and select type of cursor 
 Input:    dispAttr LCD_DISP_OFF            display off
                    LCD_DISP_ON             display on, cursor off

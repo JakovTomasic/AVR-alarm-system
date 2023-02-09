@@ -1,13 +1,6 @@
 
 # define F_CPU 7372800UL
 
-#include <avr/io.h>
-#include <avr/interrupt.h>
-#include <util/delay.h>
-#include <stdlib.h> // TODO: treba li mi ovo?
-
-#include "lcd.h"
-
 #define KEYPAD_PORT			PORTA
 #define KEYPAD_DDR 			DDRA
 #define KEYPAD_PIN 			PINA
@@ -15,10 +8,6 @@
 #define KEY_STAR			10
 #define KEY_HASH			11
 #define KEY_NONE			12
-
-#define MOTION_PIN 			PINA
-#define MOTION_PORT			PORTA
-#define MOTION_PIN_NUMBER	0
 
 #define BUZZER_DDR 			DDRC
 #define BUZZER_PORT			PORTC
@@ -31,6 +20,15 @@
 #define POLICE_2_DDR 			DDRC
 #define POLICE_2_PORT			PORTC
 #define POLICE_2_PIN_NUMBER		6
+
+#include <avr/io.h>
+#include <avr/interrupt.h>
+#include <util/delay.h>
+#include <stdlib.h> // TODO: treba li mi ovo?
+
+#include "lcd.h"
+#include "utils.h"
+
 
 /*
  * b7 -> 1 if alarm turned on, 0 if in deactivated state
@@ -69,27 +67,6 @@ uint16_t policeSwitchCountdown = 0;
 
 // Utils:
 
-void writeLCD_alignRight(uint16_t val, uint8_t width) {
-	uint8_t num;
-	char valStr[width+1];
-	for (uint8_t i = 1; i <= width; i++) {
-		if (val) {
-			valStr[width - i] = '0' + (val % 10);
-			val /= 10;
-		} else {
-			valStr[width - i] = ' ';
-		}
-	}
-	valStr[width] = '\0';
-	lcd_puts(valStr);
-}
-
-// TODO: make faster using define (and activate pull-up resistor only on init)
-uint8_t readMotion() {
-	// Activate pull-up resistor
-	MOTION_PORT |= _BV(MOTION_PIN_NUMBER);
-	return bit_is_set(MOTION_PIN, MOTION_PIN_NUMBER);
-}
 
 void buzz() {
 	// TODO: set ddr before on init
@@ -214,6 +191,15 @@ void initServo() {
 	/* Set Fast PWM, TOP in ICR1, Clear OC1A on compare match, clk/64 */
 	TCCR1A = (1<<WGM11)|(1<<COM1A1);
 	TCCR1B = (1<<WGM12)|(1<<WGM13)|(1<<CS10)|(1<<CS11);
+}
+
+void init() {
+	
+	// Activate pull-up resistor for motion sensor.
+	MOTION_PORT |= _BV(MOTION_PIN_NUMBER);
+	
+	initLcd();
+	initServo();
 }
 
 void writeCurrentStateMessage() {
@@ -360,11 +346,9 @@ void tick() {
 	}
 }
 
-
 int main(void) {
 	
-	initLcd();
-	initServo();
+	init();
 
 	state = DEFAULT_STATE;
 	refreshState();
