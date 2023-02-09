@@ -29,3 +29,17 @@ void tripleBuzz(void) {
 	BUZZER_PORT &= ~(_BV(BUZZER_PIN_NUMBER));
 }
 
+void startPolice(void) {
+	POLICE_1_PORT |= _BV(POLICE_1_PIN_NUMBER);
+	POLICE_2_PORT &= ~_BV(POLICE_2_PIN_NUMBER);
+}
+
+void stopPolice(void) {
+	POLICE_1_PORT &= ~_BV(POLICE_1_PIN_NUMBER);
+	POLICE_2_PORT &= ~_BV(POLICE_2_PIN_NUMBER);
+}
+
+void togglePolice(void) {
+	POLICE_1_PORT ^= _BV(POLICE_1_PIN_NUMBER);
+	POLICE_2_PORT ^= _BV(POLICE_2_PIN_NUMBER);
+}

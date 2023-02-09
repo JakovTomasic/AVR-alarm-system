@@ -11,6 +11,13 @@
 #define BUZZER_DURATION_MS	200
 #define BUZZER_TRIPLE_STEP_DURATION_MS	65
 
+#define POLICE_1_DDR 			DDRC
+#define POLICE_1_PORT			PORTC
+#define POLICE_1_PIN_NUMBER		1
+
+#define POLICE_2_DDR 			DDRC
+#define POLICE_2_PORT			PORTC
+#define POLICE_2_PIN_NUMBER		6
 
 // TODO: make faster using define (and activate pull-up resistor only on init)
 extern uint8_t readMotion(void);
@@ -18,5 +25,9 @@ extern uint8_t readMotion(void);
 extern void buzz(void);
 
 extern void tripleBuzz(void);
+
+extern void startPolice(void);
+extern void stopPolice(void);
+extern void togglePolice(void);
 
 #endif /* UTILS_H_ */
