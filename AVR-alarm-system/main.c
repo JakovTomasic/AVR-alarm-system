@@ -8,6 +8,7 @@
 #include "lcd.h"
 #include "utils.h"
 #include "keypad.h"
+#include "door.h"
 
 
 /*
@@ -38,10 +39,6 @@ uint8_t enteredDigits[4] = {KEY_NONE, KEY_NONE, KEY_NONE, KEY_NONE};
 
 uint16_t tickCounter = 0;
 
-// TODO: izracunaj prave vrijednosti i postavi
-#define SERVO_OPEN_OCR 175
-#define SERVO_CLOSED_OCR 300
-
 
 
 void initLcd() {
@@ -57,17 +54,6 @@ void initLcd() {
 	_delay_ms(200);
 }
 
-void initServo() {
-	
-	DDRD |= (1<<PD5);	/* Make OC1A pin as output */
-	TCNT1 = 0;			/* Set timer1 count zero */
-	ICR1 = 2499;		/* Set TOP count for timer1 in ICR1 register */
-	OCR1A = SERVO_OPEN_OCR;
-
-	/* Set Fast PWM, TOP in ICR1, Clear OC1A on compare match, clk/64 */
-	TCCR1A = (1<<WGM11)|(1<<COM1A1);
-	TCCR1B = (1<<WGM12)|(1<<WGM13)|(1<<CS10)|(1<<CS11);
-}
 
 // TODO: make initUtils function in utils
 void init() {
@@ -82,7 +68,8 @@ void init() {
 	POLICE_2_DDR |= _BV(POLICE_2_PIN_NUMBER);
 	
 	initLcd();
-	initServo();
+	initDoor();
+	openDoor();
 }
 
 void writeCurrentStateMessage() {
@@ -131,11 +118,11 @@ void refreshState() {
 	}
 	
 	if (alarmOn && intruderDetected) {
-		OCR1A = SERVO_CLOSED_OCR;
+		closeDoor();
 		tickCounter = 0;
 		startPolice();
 	} else {
-		OCR1A = SERVO_OPEN_OCR;
+		openDoor();
 		stopPolice();
 	}
 }

@@ -161,6 +161,12 @@
     </ToolchainSettings>
   </PropertyGroup>
   <ItemGroup>
+    <Compile Include="door.c">
+      <SubType>compile</SubType>
+    </Compile>
+    <Compile Include="door.h">
+      <SubType>compile</SubType>
+    </Compile>
     <Compile Include="keypad.c">
       <SubType>compile</SubType>
     </Compile>
