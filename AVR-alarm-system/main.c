@@ -39,6 +39,8 @@ uint8_t enteredDigits[4] = {KEY_NONE, KEY_NONE, KEY_NONE, KEY_NONE};
 
 uint16_t tickCounter = 0;
 
+// TODO: set to 6000
+#define MOTION_DETECTED_COUNTDOWN 600
 
 
 void initLcd() {
@@ -91,7 +93,7 @@ void refreshState() {
 	writeCurrentStateMessage();
 	if (alarmOn) {
 		if (motionDetected && !intruderDetected) {
-			tickCounter = 601; // TODO: set to 6001
+			tickCounter = MOTION_DETECTED_COUNTDOWN + 1;
 		} else {
 			resetEnteredDigits;
 		}
@@ -173,6 +175,7 @@ void tick() {
 		if (--tickCounter % 100 == 0) {
 			lcd_gotoxy(14, 1);
 			writeLCD_alignRight(tickCounter / 100, 2);
+			buzz();
 		}
 		
 		if (tickCounter == 0) {
