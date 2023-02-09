@@ -32,7 +32,7 @@
  */
 uint8_t state;
 
-#define DEFAULT_STATE 0x80
+#define DEFAULT_STATE 0
 
 // Warning: do not use these for setting state (fix that)
 #define alarmOn (state & 0x80)
@@ -76,6 +76,7 @@ uint8_t readMotion() {
 }
 
 void buzz() {
+	// TODO: set ddr before on init
 	BUZZER_DDR |= _BV(BUZZER_PIN_NUMBER);
 	BUZZER_PORT |= _BV(BUZZER_PIN_NUMBER);
 	_delay_ms(200);
@@ -153,6 +154,7 @@ uint8_t isNumber(uint8_t key) {
 
 void initLcd() {
 	
+	// TODO: ovo nam ne treba
 	DDRB |= _BV(3);
 
 	TCCR0 |= _BV(COM01) | _BV(WGM01) | _BV(WGM00) | _BV(CS01);
@@ -279,7 +281,7 @@ void checkMotion() {
 int main(void) {
 	
 	initLcd();
-	
+
 	state = DEFAULT_STATE;
 	refreshState();
 
