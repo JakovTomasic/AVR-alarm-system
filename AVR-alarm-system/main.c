@@ -133,14 +133,22 @@ void refreshState() {
 }
 
 void handleKeypress(uint8_t key) {
-	if (key == KEY_HASH && ((alarmOn && !intruderDetected) || (!alarmOn && alarmTurningOn))) {
+	if (key == KEY_HASH && ((alarmOn && !intruderDetected) || (!alarmOn && alarmTurningOn) || (alarmOn && intruderDetected))) {
 		lcd_gotoxy(0, 1);
-		lcd_puts("    ");
+		if (alarmOn && intruderDetected) {
+			lcd_puts("                ");
+			} else {
+			lcd_puts("    ");
+		}
 		resetEnteredDigits;
-	} else if (isNumber(key) && ((alarmOn && !intruderDetected) || (!alarmOn && alarmTurningOn))) {
+	} else if (isNumber(key) && ((alarmOn && !intruderDetected) || (!alarmOn && alarmTurningOn) || (alarmOn && intruderDetected))) {
 		uint8_t i;
 		lcd_gotoxy(0, 1);
-		lcd_puts("    ");
+		if (alarmOn && intruderDetected) {
+			lcd_puts("                ");
+		} else {
+			lcd_puts("    ");
+		}
 		lcd_gotoxy(0, 1);
 		for (i = 0; i < PASSWORD_LENGTH; i++) {
 			if (enteredDigits[i] == KEY_NONE) {
@@ -156,6 +164,7 @@ void handleKeypress(uint8_t key) {
 			if (enteredDigitsValue == password) {
 				state &= 0x7F;
 				state &= 0xBF;
+				state &= 0xEF;
 				state &= 0xF7;
 				resetEnteredDigits;
 				refreshState();
