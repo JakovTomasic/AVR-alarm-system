@@ -19,7 +19,8 @@
 #define POLICE_2_PORT			PORTC
 #define POLICE_2_PIN_NUMBER		6
 
-// TODO: make faster using define (and activate pull-up resistor only on init)
+extern void initUtils(void);
+
 extern uint8_t readMotion(void);
 
 extern void buzz(void);

@@ -54,24 +54,6 @@ void initLcd() {
 	_delay_ms(200);
 }
 
-
-// TODO: make initUtils function in utils
-void init() {
-	
-	// Activate pull-up resistor for motion sensor.
-	MOTION_PORT |= _BV(MOTION_PIN_NUMBER);
-	// Set buzzer DDR as out
-	BUZZER_DDR |= _BV(BUZZER_PIN_NUMBER);
-	
-	// Set police pins DDR as out
-	POLICE_1_DDR |= _BV(POLICE_1_PIN_NUMBER);
-	POLICE_2_DDR |= _BV(POLICE_2_PIN_NUMBER);
-	
-	initLcd();
-	initDoor();
-	openDoor();
-}
-
 void writeCurrentStateMessage() {
 	if (alarmOn) {
 		if (intruderDetected) {
@@ -205,12 +187,18 @@ void tick() {
 	}
 }
 
+void init() {
+	initUtils();
+	initLcd();
+	initDoor();
+	
+	state = DEFAULT_STATE;
+	refreshState();
+}
+
 int main(void) {
 	
 	init();
-
-	state = DEFAULT_STATE;
-	refreshState();
 
 	buzz();
 
