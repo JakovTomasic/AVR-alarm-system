@@ -10,10 +10,9 @@
 #define KEY_HASH			11
 #define KEY_NONE			12
 
-extern uint8_t getKeyPressed(void);
+#define isNumber(key) (key < 10)
 
-// TODO: make faster using define?
-extern uint8_t isNumber(uint8_t key);
+extern uint8_t getKeyPressed(void);
 
 
 #endif /* KEYPAD_H_ */

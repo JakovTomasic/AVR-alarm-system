@@ -12,7 +12,6 @@
 #include <avr/io.h>
 #include <avr/interrupt.h>
 #include <util/delay.h>
-#include <stdlib.h> // TODO: treba li mi ovo?
 
 #include "lcd.h"
 #include "utils.h"

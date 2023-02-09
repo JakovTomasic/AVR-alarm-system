@@ -64,9 +64,4 @@ uint8_t getKeyPressed(void)
 	return KEY_NONE;
 }
 
-// TODO: make faster using define?
-uint8_t isNumber(uint8_t key) {
-	return key < 10;
-}
-
 
