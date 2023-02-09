@@ -55,13 +55,6 @@ uint16_t policeSwitchCountdown = 0;
 
 
 void initLcd() {
-	
-	// TODO: ovo nam ne treba
-	DDRB |= _BV(3);
-
-	TCCR0 |= _BV(COM01) | _BV(WGM01) | _BV(WGM00) | _BV(CS01);
-	OCR0 = 128;
-	
 	lcd_init(LCD_DISP_ON);
 	lcd_clrscr();
 	lcd_puts("Starting");
