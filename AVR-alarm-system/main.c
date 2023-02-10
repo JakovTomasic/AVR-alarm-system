@@ -70,8 +70,10 @@ void writeLogUserToLcd(uint8_t userId);
 void lcdWriteEnteredDigits();
 void lcdWriteTickCountdown();
 void lcdWriteLog();
+void lcdShowWrongPassword();
 void writeCurrentStateMessage();
 void refreshState();
+void handlePasswordEntered();
 void handleKeypress(uint8_t key);
 void updateMotion();
 void tick();
@@ -218,6 +220,14 @@ void lcdWriteTickCountdown() {
 	writeLCD_alignRight(lcdCountdownValue, 2);
 }
 
+void lcdShowWrongPassword() {
+	lcd_clrscr();
+	lcd_puts("Wrong password");
+	tripleBuzz();
+	_delay_ms(1000);
+	writeCurrentStateMessage();
+}
+
 void lcdWriteLog() {
 	lcd_clrscr();
 	lcd_gotoxy(13, 0);
@@ -322,12 +332,62 @@ void refreshState() {
 	writeCurrentStateMessage();
 }
 
+void handlePasswordEntered() {
+	uint8_t isAdmin = checkEnteredPassword(enteredDigits, adminPassword);
+	uint8_t user = getUserIdForEnteredPassword(enteredDigits);
+	if (!intruderDetected && (alarmOn || alarmTurningOn)) {
+		if (isAdmin || user) {
+			alarmOn = 0;
+			motionDetected = 0;
+			intruderDetected = 0;
+			alarmTurningOn = 0;
+			writeLoginToLog(user);
+			refreshState();
+		} else {
+			lcdShowWrongPassword();
+		}
+	} else if (intruderDetected && alarmOn) {
+		if (isAdmin) {
+			alarmOn = 0;
+			motionDetected = 0;
+			intruderDetected = 0;
+			alarmTurningOn = 0;
+			writeLoginToLog(user);
+			refreshState();
+		} else {
+			lcdShowWrongPassword();
+		}
+	} else if (logOpened && !adminAuth) {
+		if (isAdmin) {
+			adminAuth = 1;
+			refreshState();
+		} else {
+			lcdShowWrongPassword();
+		}
+	} else if (clearLogAction && !adminAuth) {
+		if (isAdmin) {
+			clearLog();
+			clearLogAction = 0;
+			
+			lcd_clrscr();
+			lcd_puts("Log cleared");
+			tripleBuzz();
+			_delay_ms(1000);
+			refreshState();
+		} else {
+			lcdShowWrongPassword();
+		}
+	}
+	
+	resetEnteredDigits();
+}
+
 void handleKeypress(uint8_t key) {
 	if (key == KEY_HASH && (alarmOn || (!alarmOn && alarmTurningOn) || (!alarmOn && logOpened && !adminAuth) || (!alarmOn && clearLogAction && !adminAuth))) {
 		lcd_gotoxy(0, 1);
 		if (alarmOn && intruderDetected) {
 			lcd_puts("                ");
-			} else {
+		} else {
 			lcd_puts("    ");
 		}
 		resetEnteredDigits();
@@ -349,36 +409,7 @@ void handleKeypress(uint8_t key) {
 		lcdWriteEnteredDigits();
 		
 		if (i == PASSWORD_LENGTH - 1) {
-			uint8_t isAdmin = checkEnteredPassword(enteredDigits, adminPassword);
-			uint8_t user = getUserIdForEnteredPassword(enteredDigits);
-			if (isAdmin || user) {
-				if (alarmOn || alarmTurningOn) {
-					alarmOn = 0;
-					motionDetected = 0;
-					intruderDetected = 0;
-					alarmTurningOn = 0;
-					writeLoginToLog(user);
-				} else if (logOpened) {
-					adminAuth = 1;
-				} else if (clearLogAction) {
-					clearLog();
-					clearLogAction = 0;
-					
-					lcd_clrscr();
-					lcd_puts("Log cleared");
-					tripleBuzz();
-					_delay_ms(1000);
-				}
-				resetEnteredDigits();
-				refreshState();
-			} else {
-				lcd_clrscr();
-				lcd_puts("Wrong password");
-				tripleBuzz();
-				_delay_ms(1000);
-				resetEnteredDigits();
-				writeCurrentStateMessage();
-			}
+			handlePasswordEntered();
 		}
 	} else if (logOpened) {
 		if (key == KEY_STAR) {
@@ -422,7 +453,7 @@ void handleKeypress(uint8_t key) {
 				clearLogAction = 1;
 				specialInputActive = 0;
 				refreshState();
-			}else if (key == KEY_STAR) {
+			} else if (key == KEY_STAR) {
 				// Close special input screen
 				specialInputActive = 0;
 				refreshState();
