@@ -113,7 +113,7 @@ ISR(TIMER0_COMP_vect) {
 		}
 		
 		if (tickCounter == 0) {
-		} else if (tickCounter % TICKS_PER_ONE_SECOND == 0) {
+		} else if (tickCounter % (TICKS_PER_ONE_SECOND>>1) == 0) {
 			lcdCountdownValue = tickCounter / TICKS_PER_ONE_SECOND;
 			tickPendingActionFlag = 1;
 		}
