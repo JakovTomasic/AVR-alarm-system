@@ -51,12 +51,17 @@ typedef struct {
 
 
 #define PASSWORD_LENGTH 4
-const uint16_t password = 1234;
+#define PASSWORD_USERS_COUNT 4
+
+uint8_t adminPassword[4] = {1, 2, 3, 4};
+uint8_t userPasswords[4][4] = {
+	{1, 1, 1, 1}, // user 1
+	{2, 2, 2, 2}, // user 2
+	{3, 3, 3, 3}, // user 3
+	{4, 4, 4, 4}, // user 4
+};
 
 uint8_t enteredDigits[4] = {KEY_NONE, KEY_NONE, KEY_NONE, KEY_NONE};
-
-#define resetEnteredDigits enteredDigits[0] = enteredDigits[1] = enteredDigits[2] = enteredDigits[3] = KEY_NONE
-#define enteredDigitsValue (enteredDigits[0]*1000 + enteredDigits[1]*100 + enteredDigits[2]*10 + enteredDigits[3])
 
 uint16_t tickCounter = 0;
 
@@ -70,6 +75,56 @@ uint8_t logIndex = 0;
 
 #define LOG_SIZE_ADDRESS 1
 #define LOG_FIRST_ADDRESS 2
+
+void resetEnteredDigits() {
+	enteredDigits[0] = enteredDigits[1] = enteredDigits[2] = enteredDigits[3] = KEY_NONE;
+}
+
+uint8_t checkEnteredPassword(uint8_t *pass) {
+	for (uint8_t j = 0; j < PASSWORD_LENGTH; j++) {
+		if (enteredDigits[j] != pass[j]) {
+			return 0;
+		} else if (j == PASSWORD_LENGTH-1) {
+			return 1;
+		}
+	}
+	return 0;
+}
+
+uint8_t getUserIdForEnteredPassword() {
+	for (uint8_t i = 0; i < PASSWORD_USERS_COUNT; i++) {
+		if (checkEnteredPassword(userPasswords[i])) {
+			return i + 1;
+		}
+	}
+	return 0;
+}
+
+void writeLoginToLog(uint8_t userId) {
+	eeprom_update_byte(( uint8_t *) LOG_FIRST_ADDRESS + logSize, userId);
+	logSize++;
+	eeprom_update_byte (( uint8_t *) LOG_SIZE_ADDRESS, logSize);
+}
+
+void clearLog() {
+	logSize = 0;
+	logIndex = 0;
+	eeprom_update_byte (( uint8_t *) LOG_SIZE_ADDRESS, 0);
+}
+
+uint8_t getUserIdFromLog(uint8_t index) {
+	return eeprom_read_byte((const uint8_t*) LOG_FIRST_ADDRESS + index);
+}
+
+void writeLogUserToLcd(uint8_t userId) {
+	if (userId == 0) {
+		lcd_puts("Admin");
+	} else {
+		lcd_puts("User ");
+		writeLCD(userId);
+	}
+}
+
 
 void initLcd() {
 	lcd_init(LCD_DISP_ON);
@@ -136,22 +191,30 @@ void writeCurrentStateMessage() {
 				lcd_clrscr();
 				lcd_gotoxy(13, 0);
 				lcd_puts("Log");
-				if (logSize < 10) {
+				
+				uint8_t page = (logIndex >> 1) + 1;
+				uint8_t pagesCount = (logSize + 1) >> 1;
+				
+				if (pagesCount < 10) {
 					lcd_gotoxy(12, 1);
 				} else {
 					lcd_gotoxy(11, 1);
 				}
-				writeLCD_alignRight(logIndex+1, 2);
+				writeLCD_alignRight(page, 2);
 				lcd_putc('/');
-				writeLCD(logSize);
+				writeLCD(pagesCount);
 				
 				if (logIndex < logSize) {
 					lcd_gotoxy(0, 0);
-					writeLCD(eeprom_read_word((const uint16_t*) LOG_FIRST_ADDRESS + (logIndex << 1)));
+					writeLCD(logIndex+1);
+					lcd_puts(". ");
+					writeLogUserToLcd(getUserIdFromLog(logIndex));
 				}
 				if (logIndex+1 < logSize) {
 					lcd_gotoxy(0, 1);
-					writeLCD(eeprom_read_word((const uint16_t*) LOG_FIRST_ADDRESS + ((logIndex+1) << 1)));
+					writeLCD(logIndex+2);
+					lcd_puts(". ");
+					writeLogUserToLcd(getUserIdFromLog(logIndex+1));
 				}
 			} else {
 				lcd_clrscr();
@@ -174,13 +237,13 @@ void refreshState() {
 		if (motionDetected && !intruderDetected) {
 			tickCounter = MOTION_DETECTED_COUNTDOWN + 1;
 		} else {
-			resetEnteredDigits;
+			resetEnteredDigits();
 		}
 	} else if (alarmTurningOn) {
 		tickCounter = ALARM_TURN_ON_COUNTDOWN + 1;
-		resetEnteredDigits;
+		resetEnteredDigits();
 	} else {
-		resetEnteredDigits;
+		resetEnteredDigits();
 	}
 	
 	if (alarmOn && intruderDetected) {
@@ -201,7 +264,7 @@ void handleKeypress(uint8_t key) {
 			} else {
 			lcd_puts("    ");
 		}
-		resetEnteredDigits;
+		resetEnteredDigits();
 	} else if (isNumber(key) && (alarmOn || (!alarmOn && alarmTurningOn) || (!alarmOn && logOpened && !adminAuth) || (!alarmOn && clearLogAction && !adminAuth))) {
 		uint8_t i;
 		lcd_gotoxy(0, 1);
@@ -222,20 +285,19 @@ void handleKeypress(uint8_t key) {
 		}
 		
 		if (i == PASSWORD_LENGTH - 1) {
-			if (enteredDigitsValue == password) {
+			uint8_t isAdmin = checkEnteredPassword(adminPassword);
+			uint8_t user = getUserIdForEnteredPassword();
+			if (isAdmin || user) {
 				if (alarmOn || alarmTurningOn) {
 					alarmOn = 0;
 					motionDetected = 0;
 					intruderDetected = 0;
 					alarmTurningOn = 0;
-					eeprom_update_word(( uint16_t *) LOG_FIRST_ADDRESS + (logSize<<1), password);
-					logSize++;
-					eeprom_update_byte (( uint8_t *) LOG_SIZE_ADDRESS, logSize);
+					writeLoginToLog(user);
 				} else if (logOpened) {
 					adminAuth = 1;
 				} else if (clearLogAction) {
-					logSize = 0;
-					eeprom_update_byte (( uint8_t *) LOG_SIZE_ADDRESS, 0);
+					clearLog();
 					clearLogAction = 0;
 					
 					lcd_clrscr();
@@ -243,14 +305,14 @@ void handleKeypress(uint8_t key) {
 					tripleBuzz();
 					_delay_ms(1000);
 				}
-				resetEnteredDigits;
+				resetEnteredDigits();
 				refreshState();
 			} else {
 				lcd_clrscr();
 				lcd_puts("Wrong password");
 				tripleBuzz();
 				_delay_ms(1000);
-				resetEnteredDigits;
+				resetEnteredDigits();
 				writeCurrentStateMessage();
 			}
 		}
@@ -259,6 +321,14 @@ void handleKeypress(uint8_t key) {
 			logOpened = 0;
 			adminAuth = 0;
 			refreshState();
+		} else if (key == 2 && logIndex > 0) {
+			// up
+			logIndex -= 2;
+			writeCurrentStateMessage();
+		} else if (key == 8 && logIndex+1 < logSize-1) {
+			// down
+			logIndex += 2;
+			writeCurrentStateMessage();
 		}
 	} else if (!alarmOn) {
 		if (specialInputActive) {
@@ -280,6 +350,7 @@ void handleKeypress(uint8_t key) {
 			} else if (key == 1) {
 				// Open log
 				logOpened = 1;
+				logIndex = 0;
 				specialInputActive = 0;
 				refreshState();
 			} else if (key == 2) {
