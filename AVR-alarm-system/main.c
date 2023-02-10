@@ -55,6 +55,7 @@ uint8_t enteredDigits[4] = {KEY_NONE, KEY_NONE, KEY_NONE, KEY_NONE};
 volatile uint16_t tickCounter = 0;
 // Value meaning depends on the current state.
 volatile uint8_t tickPendingActionFlag = 0;
+volatile uint8_t lcdCountdownValue = 0;
 
 #define MOTION_DETECTED_COUNTDOWN 600
 #define ALARM_TURN_ON_COUNTDOWN 600
@@ -62,6 +63,122 @@ volatile uint8_t tickPendingActionFlag = 0;
 
 void resetEnteredDigits() {
 	enteredDigits[0] = enteredDigits[1] = enteredDigits[2] = enteredDigits[3] = KEY_NONE;
+}
+
+void initLcd();
+void writeLogUserToLcd(uint8_t userId);
+void lcdWriteEnteredDigits();
+void lcdWriteTickCountdown();
+void lcdWriteLog();
+void writeCurrentStateMessage();
+void refreshState();
+void handleKeypress(uint8_t key);
+void updateMotion();
+void tick();
+void initClock();
+void init();
+
+int main(void) {
+	
+	init();
+
+	buzz();
+
+	uint8_t key, lastKey = KEY_NONE;
+	
+	while (1) {
+		_delay_ms(2);
+
+		updateMotion();
+
+		key = getKeyPressedDebounce();
+		
+		if (key != KEY_NONE && key != lastKey) {
+			handleKeypress(key);
+			buzz();
+		}
+		
+		lastKey = key;
+		
+		tick();
+	}
+}
+
+ISR(TIMER0_COMP_vect) {
+	if (alarmOn && motionDetected && !intruderDetected) {
+		if (tickCounter > 0) {
+			tickCounter--;
+		}
+		
+		if (tickCounter == 0) {
+		} else if (tickCounter % TICKS_PER_ONE_SECOND == 0) {
+			lcdCountdownValue = tickCounter / TICKS_PER_ONE_SECOND;
+			tickPendingActionFlag = 1;
+		}
+	} else if (!alarmOn && alarmTurningOn) {
+		if (tickCounter > 0) {
+			tickCounter--;
+		}
+		
+		if (tickCounter == 0) {
+		} else if (tickCounter % TICKS_PER_ONE_SECOND == 0) {
+			lcdCountdownValue = tickCounter / TICKS_PER_ONE_SECOND;
+			tickPendingActionFlag = 1;
+		}
+	} else if (intruderDetected) {
+		if (++tickCounter == TICKS_PER_ONE_SECOND) {
+			tickPendingActionFlag = 1;
+			tickCounter = 0;
+		}
+	}
+}
+
+
+void tick() {
+	if (alarmOn && motionDetected && !intruderDetected) {
+		if (tickCounter == 0) {
+			intruderDetected = 1;
+			refreshState();
+		} else if (tickPendingActionFlag) {
+			lcdWriteTickCountdown();
+			buzz();
+		}
+	} else if (!alarmOn && alarmTurningOn) {
+		if (tickCounter == 0) {
+			tripleBuzz();
+			alarmOn = 1;
+			refreshState();
+		} else if (tickPendingActionFlag) {
+			lcdWriteTickCountdown();
+			buzz();
+		}
+	} else if (intruderDetected) {
+		if (tickPendingActionFlag) {
+			togglePolice();
+		}
+	}
+	tickPendingActionFlag = 0;
+}
+
+void init() {
+	initUtils();
+	initLcd();
+	initDoor();
+	initLog();
+	initClock();
+	
+	stateReg = DEFAULT_STATE;
+	refreshState();
+}
+
+void initClock() {
+	// Prescaler 1024, CTC mode with TOP in OCR0
+	TCCR0 = _BV(WGM01) | _BV(CS02) | _BV(CS00);
+	TIMSK |= _BV(OCIE0);
+	// TOP = f_CPU / (F * N) - 1
+	// F = 100 -> TOP = 71
+	OCR0 = 71;
+	sei();
 }
 
 void initLcd() {
@@ -86,7 +203,7 @@ void writeLogUserToLcd(uint8_t userId) {
 	}
 }
 
-void LCDwriteEnteredDigits() {
+void lcdWriteEnteredDigits() {
 	for (uint8_t i = 0; i < PASSWORD_LENGTH; i++) {
 		if (enteredDigits[i] == KEY_NONE) {
 			break;
@@ -96,9 +213,9 @@ void LCDwriteEnteredDigits() {
 	}
 }
 
-void LcdWriteTickCountdown() {
+void lcdWriteTickCountdown() {
 	lcd_gotoxy(14, 1);
-	writeLCD_alignRight(tickPendingActionFlag, 2);
+	writeLCD_alignRight(lcdCountdownValue, 2);
 }
 
 void lcdWriteLog() {
@@ -143,8 +260,8 @@ void writeCurrentStateMessage() {
 			lcd_clrscr();
 			lcd_puts("I see you moving");
 			lcd_gotoxy(0, 1);
-			LCDwriteEnteredDigits();
-			LcdWriteTickCountdown();
+			lcdWriteEnteredDigits();
+			lcdWriteTickCountdown();
 		} else {
 			lcd_clrscr();
 			lcd_puts("Alarm on");
@@ -153,8 +270,8 @@ void writeCurrentStateMessage() {
 		lcd_clrscr();
 		lcd_puts("Alarm turning on");
 		lcd_gotoxy(0, 1);
-		LCDwriteEnteredDigits();
-		LcdWriteTickCountdown();
+		lcdWriteEnteredDigits();
+		lcdWriteTickCountdown();
 	} else {
 		if (specialInputActive) {
 			lcd_clrscr();
@@ -178,14 +295,15 @@ void writeCurrentStateMessage() {
 }
 
 void refreshState() {
-	writeCurrentStateMessage();
 	if (alarmOn) {
 		if (motionDetected && !intruderDetected) {
+			lcdCountdownValue = MOTION_DETECTED_COUNTDOWN / TICKS_PER_ONE_SECOND;
 			tickCounter = MOTION_DETECTED_COUNTDOWN + 1;
 		} else {
 			resetEnteredDigits();
 		}
 	} else if (alarmTurningOn) {
+		lcdCountdownValue = ALARM_TURN_ON_COUNTDOWN / TICKS_PER_ONE_SECOND;
 		tickCounter = ALARM_TURN_ON_COUNTDOWN + 1;
 		resetEnteredDigits();
 	} else {
@@ -200,6 +318,8 @@ void refreshState() {
 		openDoor();
 		stopPolice();
 	}
+	
+	writeCurrentStateMessage();
 }
 
 void handleKeypress(uint8_t key) {
@@ -226,7 +346,7 @@ void handleKeypress(uint8_t key) {
 				break;
 			}
 		}
-		LCDwriteEnteredDigits();
+		lcdWriteEnteredDigits();
 		
 		if (i == PASSWORD_LENGTH - 1) {
 			uint8_t isAdmin = checkEnteredPassword(enteredDigits, adminPassword);
@@ -325,105 +445,5 @@ void updateMotion() {
 	} else if (motionDetected && !motion && !alarmOn) {
 		// Set motion detected back to false only if alarm is not on
 		motionDetected = 0;
-	}
-}
-
-void tick() {
-	if (alarmOn && motionDetected && !intruderDetected) {
-		if (tickCounter == 0) {
-			intruderDetected = 1;
-			refreshState();
-		} else if (tickPendingActionFlag) {
-			LcdWriteTickCountdown();
-			buzz();
-		}
-	} else if (!alarmOn && alarmTurningOn) {
-		if (tickCounter == 0) {
-			tripleBuzz();
-			alarmOn = 1;
-			refreshState();
-		} else if (tickPendingActionFlag) {
-			LcdWriteTickCountdown();
-			buzz();
-		}
-	} else if (intruderDetected) {
-		if (tickPendingActionFlag) {
-			togglePolice();
-			tickPendingActionFlag = 0;
-		}
-	}
-}
-
-void initClock() {
-	// Prescaler 1024, CTC mode with TOP in OCR0
-	TCCR0 = _BV(WGM01) | _BV(CS02) | _BV(CS00);
-	TIMSK |= _BV(OCIE0);
-	// TOP = f_CPU / (F * N) - 1
-	// F = 100 -> TOP = 71
-	OCR0 = 71;
-	sei();
-}
-
-void init() {
-	initUtils();
-	initLcd();
-	initDoor();
-	initLog();
-	initClock();
-	
-	stateReg = DEFAULT_STATE;
-	refreshState();
-}
-
-int main(void) {
-	
-	init();
-
-	buzz();
-
-	uint8_t key, lastKey = KEY_NONE;
-	
-	while (1) {
-		_delay_ms(2);
-
-		updateMotion();
-
-		key = getKeyPressedDebounce();
-		
-		if (key != KEY_NONE && key != lastKey) {
-			handleKeypress(key);
-			buzz();
-		}
-		
-		lastKey = key;
-		
-		tick();
-	}
-}
-
-ISR(TIMER0_COMP_vect) {
-	if (alarmOn && motionDetected && !intruderDetected) {
-		if (tickCounter > 0) {
-			tickCounter--;
-		}
-		
-		if (tickCounter == 0) {
-		} else if (tickCounter % TICKS_PER_ONE_SECOND == 0) {
-			tickPendingActionFlag = tickCounter / TICKS_PER_ONE_SECOND;
-		}
-	} else if (!alarmOn && alarmTurningOn) {
-		if (tickCounter > 0) {
-			tickCounter--;
-		}
-		
-		if (tickCounter == 0) {
-		} else if (tickCounter % TICKS_PER_ONE_SECOND == 0) {
-			tickPendingActionFlag = tickCounter / TICKS_PER_ONE_SECOND;
-		}
-	} else if (intruderDetected) {
-		if (++tickCounter == TICKS_PER_ONE_SECOND) {
-			tickPendingActionFlag = 1;
-			tickCounter = 0;
-		}
 	}
 }
