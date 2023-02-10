@@ -70,7 +70,7 @@ void writeLogUserToLcd(uint8_t userId);
 void lcdWriteEnteredDigits();
 void lcdWriteTickCountdown();
 void lcdWriteLog();
-void lcdShowWrongPassword();
+void onWrongPassword();
 void writeCurrentStateMessage();
 void refreshState();
 void handlePasswordEntered();
@@ -220,11 +220,12 @@ void lcdWriteTickCountdown() {
 	writeLCD_alignRight(lcdCountdownValue, 2);
 }
 
-void lcdShowWrongPassword() {
+void onWrongPassword() {
 	lcd_clrscr();
 	lcd_puts("Wrong password");
 	tripleBuzz();
 	_delay_ms(1000);
+	resetEnteredDigits();
 	writeCurrentStateMessage();
 }
 
@@ -286,7 +287,7 @@ void writeCurrentStateMessage() {
 		if (specialInputActive) {
 			lcd_clrscr();
 			lcd_puts("Enter an action");
-		} else if (logOpened || clearLogAction) {
+		} else if (logOpened) {
 			if (adminAuth) {
 				lcdWriteLog();
 			} else {
@@ -295,8 +296,7 @@ void writeCurrentStateMessage() {
 			}
 		} else if (clearLogAction && !adminAuth) {
 			lcd_clrscr();
-			lcd_gotoxy(13, 0);
-			lcd_puts("Log");
+			lcd_puts("Enter admin pass");
 		} else {
 			lcd_clrscr();
 			lcd_puts("Alarm off");
@@ -344,7 +344,7 @@ void handlePasswordEntered() {
 			writeLoginToLog(user);
 			refreshState();
 		} else {
-			lcdShowWrongPassword();
+			onWrongPassword();
 		}
 	} else if (intruderDetected && alarmOn) {
 		if (isAdmin) {
@@ -355,14 +355,14 @@ void handlePasswordEntered() {
 			writeLoginToLog(user);
 			refreshState();
 		} else {
-			lcdShowWrongPassword();
+			onWrongPassword();
 		}
 	} else if (logOpened && !adminAuth) {
 		if (isAdmin) {
 			adminAuth = 1;
 			refreshState();
 		} else {
-			lcdShowWrongPassword();
+			onWrongPassword();
 		}
 	} else if (clearLogAction && !adminAuth) {
 		if (isAdmin) {
@@ -375,11 +375,9 @@ void handlePasswordEntered() {
 			_delay_ms(1000);
 			refreshState();
 		} else {
-			lcdShowWrongPassword();
+			onWrongPassword();
 		}
 	}
-	
-	resetEnteredDigits();
 }
 
 void handleKeypress(uint8_t key) {
@@ -425,6 +423,12 @@ void handleKeypress(uint8_t key) {
 			logIndex += 2;
 			writeCurrentStateMessage();
 		}
+	} else if (clearLogAction) {
+		if (key == KEY_STAR) {
+			clearLogAction = 0;
+			adminAuth = 0;
+			refreshState();
+		}
 	} else if (!alarmOn) {
 		if (specialInputActive) {
 			if (key == 0) {
@@ -459,8 +463,8 @@ void handleKeypress(uint8_t key) {
 				refreshState();
 			}
 		} else if (key == KEY_STAR) {
-			
 			specialInputActive = 1;
+			adminAuth = 0;
 			refreshState();
 		}
 	}
