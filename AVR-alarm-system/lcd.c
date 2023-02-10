@@ -25,6 +25,7 @@
 #include <inttypes.h>
 #include <avr/io.h>
 #include <avr/pgmspace.h>
+#include <stdlib.h>
 #include "lcd.h"
 
 
@@ -511,10 +512,22 @@ void lcd_puts_p(const char *progmem_s)
 
 
 /*************************************************************************
+Display the number.
+
+Input:     number to be displayed
+Returns:   none
+*************************************************************************/
+void writeLCD(uint16_t val) {
+	char valStr[16];
+	itoa(val, valStr, 10);
+	lcd_puts(valStr);
+}
+
+/*************************************************************************
 Display number inside given width space.
 If the number has less digits than given width then the number will 
 be aligned right and left padding from the number will be filled with spaces.
-Input:     string from program memory be be displayed
+Input:     number to be displayed and width for number to be displayed and aligned in
 Returns:   none
 *************************************************************************/
 void writeLCD_alignRight(uint16_t val, const uint8_t width) {
@@ -523,6 +536,8 @@ void writeLCD_alignRight(uint16_t val, const uint8_t width) {
 		if (val) {
 			valStr[width - i] = '0' + (val % 10);
 			val /= 10;
+		} else if (i == 1) {
+			valStr[width - i] = '0';
 		} else {
 			valStr[width - i] = ' ';
 		}

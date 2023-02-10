@@ -4,6 +4,7 @@
 #include <avr/io.h>
 #include <avr/interrupt.h>
 #include <util/delay.h>
+#include <avr/eeprom.h>
 
 #include "lcd.h"
 #include "utils.h"
@@ -64,6 +65,11 @@ uint16_t tickCounter = 0;
 #define ALARM_TURN_ON_COUNTDOWN 3000
 #define TICKS_PER_ONE_SECOND 500
 
+uint8_t logSize = 0;
+uint8_t logIndex = 0;
+
+#define LOG_SIZE_ADDRESS 1
+#define LOG_FIRST_ADDRESS 2
 
 void initLcd() {
 	lcd_init(LCD_DISP_ON);
@@ -76,6 +82,11 @@ void initLcd() {
 	_delay_ms(200);
 	lcd_putc('.');
 	_delay_ms(200);
+}
+
+void initLog() {
+	logSize = eeprom_read_byte ((const uint8_t*) LOG_SIZE_ADDRESS);
+	logIndex = 0;
 }
 
 void LCDwriteEnteredDigits() {
@@ -125,10 +136,31 @@ void writeCurrentStateMessage() {
 				lcd_clrscr();
 				lcd_gotoxy(13, 0);
 				lcd_puts("Log");
+				if (logSize < 10) {
+					lcd_gotoxy(12, 1);
+				} else {
+					lcd_gotoxy(11, 1);
+				}
+				writeLCD_alignRight(logIndex+1, 2);
+				lcd_putc('/');
+				writeLCD(logSize);
+				
+				if (logIndex < logSize) {
+					lcd_gotoxy(0, 0);
+					writeLCD(eeprom_read_word((const uint16_t*) LOG_FIRST_ADDRESS + (logIndex << 1)));
+				}
+				if (logIndex+1 < logSize) {
+					lcd_gotoxy(0, 1);
+					writeLCD(eeprom_read_word((const uint16_t*) LOG_FIRST_ADDRESS + ((logIndex+1) << 1)));
+				}
 			} else {
 				lcd_clrscr();
 				lcd_puts("Enter admin pass");
 			}
+		} else if (clearLogAction && !adminAuth) {
+			lcd_clrscr();
+			lcd_gotoxy(13, 0);
+			lcd_puts("Log");
 		} else {
 			lcd_clrscr();
 			lcd_puts("Alarm off");
@@ -196,11 +228,14 @@ void handleKeypress(uint8_t key) {
 					motionDetected = 0;
 					intruderDetected = 0;
 					alarmTurningOn = 0;
+					eeprom_update_word(( uint16_t *) LOG_FIRST_ADDRESS + (logSize<<1), password);
+					logSize++;
+					eeprom_update_byte (( uint8_t *) LOG_SIZE_ADDRESS, logSize);
 				} else if (logOpened) {
 					adminAuth = 1;
 				} else if (clearLogAction) {
-					// TODO: clear log
-					
+					logSize = 0;
+					eeprom_update_byte (( uint8_t *) LOG_SIZE_ADDRESS, 0);
 					clearLogAction = 0;
 					
 					lcd_clrscr();
@@ -312,6 +347,7 @@ void init() {
 	initUtils();
 	initLcd();
 	initDoor();
+	initLog();
 	
 	stateReg = DEFAULT_STATE;
 	refreshState();
