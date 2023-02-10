@@ -50,9 +50,10 @@ uint8_t enteredDigits[4] = {KEY_NONE, KEY_NONE, KEY_NONE, KEY_NONE};
 
 uint16_t tickCounter = 0;
 
-// TODO: set to 6000
-#define MOTION_DETECTED_COUNTDOWN 600
-#define ALARM_TURN_ON_COUNTDOWN 600
+// TODO: set to 30000
+#define MOTION_DETECTED_COUNTDOWN 3000
+#define ALARM_TURN_ON_COUNTDOWN 3000
+#define TICKS_PER_ONE_SECOND 500
 
 
 void initLcd() {
@@ -80,7 +81,7 @@ void LCDwriteEnteredDigits() {
 
 void LcdWriteTickCountdown() {
 	lcd_gotoxy(14, 1);
-	writeLCD_alignRight(tickCounter / 100, 2);
+	writeLCD_alignRight(tickCounter / TICKS_PER_ONE_SECOND, 2);
 }
 
 void writeCurrentStateMessage() {
@@ -127,6 +128,7 @@ void refreshState() {
 		}
 	} else if (alarmTurningOn) {
 		tickCounter = ALARM_TURN_ON_COUNTDOWN + 1;
+		resetEnteredDigits;
 	} else {
 		resetEnteredDigits;
 	}
@@ -234,7 +236,7 @@ void tick() {
 		if (tickCounter == 0) {
 			intruderDetected = 1;
 			refreshState();
-		} else if (tickCounter % 100 == 0) {
+		} else if (tickCounter % TICKS_PER_ONE_SECOND == 0) {
 			LcdWriteTickCountdown();
 			buzz();
 		}
@@ -245,12 +247,12 @@ void tick() {
 			tripleBuzz();
 			alarmOn = 1;
 			refreshState();
-		} else if (tickCounter % 100 == 0) {
+		} else if (tickCounter % TICKS_PER_ONE_SECOND == 0) {
 			LcdWriteTickCountdown();
 			buzz();
 		}
 	} else if (intruderDetected) {
-		if (++tickCounter == 100) {
+		if (++tickCounter == TICKS_PER_ONE_SECOND) {
 			togglePolice();
 			tickCounter = 0;
 		}
@@ -289,11 +291,11 @@ int main(void) {
 	
 	
 	while (1) {
-		_delay_ms(10);
+		_delay_ms(2);
 
 		updateMotion();
 
-		key = getKeyPressed();
+		key = getKeyPressedDebounce();
 
 		/*
 		lcd_clrscr();

@@ -46,3 +46,33 @@ uint8_t getKeyPressed(void)
 	// Indicate no key pressed
 	return KEY_NONE;
 }
+
+
+uint8_t getKeyPressedDebounce(void) {
+	static uint8_t y_old=0, flag=0, oldKey=KEY_NONE;
+	uint8_t temp;
+
+	//digital filter part y_old = x_new*0.25 + y_old*0.75
+	temp = y_old >> 2;   //this gives y_old/4
+	y_old = y_old - temp; //do (y_old*0.75) by subtraction
+	
+	uint8_t key = getKeyPressed();
+	
+	if (key != KEY_NONE) {
+		//if button is pressed, add 0.25 (3F) of new value (1.0)
+		if(key == oldKey){
+			y_old = y_old + 0x3F;
+		}
+		oldKey = key;
+	}
+
+	//software schmitt trigger
+	if((y_old > 0xF0) && (flag==0)){
+		flag=1;
+		return key;
+	} else if((y_old < 0x0F) && (flag==1)){
+		flag=0;
+	}
+	
+	return KEY_NONE;
+}

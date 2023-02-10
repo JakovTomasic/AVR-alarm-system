@@ -14,5 +14,8 @@
 
 extern uint8_t getKeyPressed(void);
 
+// Call this function every few ms
+extern uint8_t getKeyPressedDebounce(void);
+
 
 #endif /* KEYPAD_H_ */
