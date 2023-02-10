@@ -17,6 +17,9 @@
  * b5 -> special action input mode. 1 if active, 0 otherwise
  * b4 -> 1 if intruder detected, 0 otherwise
  * b3 -> 1 if alarm is being turned on (countdown active), 0 otherwise
+ * b2 -> 1 if admin is currently authenticated, 0 otherwise
+ * b1 -> 1 if log is opened, 0 otherwise
+ * b0 -> 1 if clear log feature is opened, 0 otherwise
  * other bits -> reserved
  */
 typedef struct {
@@ -25,6 +28,9 @@ typedef struct {
 	uint8_t bit5:1;
 	uint8_t bit4:1;
 	uint8_t bit3:1;
+	uint8_t bit2:1;
+	uint8_t bit1:1;
+	uint8_t bit0:1;
 } stateRegBits;
 
 //use one of otherwise unused SFRs as states register, for instance TWBR
@@ -36,6 +42,9 @@ typedef struct {
 #define specialInputActive ((volatile stateRegBits*)_SFR_MEM_ADDR(stateReg))->bit5
 #define intruderDetected ((volatile stateRegBits*)_SFR_MEM_ADDR(stateReg))->bit4
 #define alarmTurningOn ((volatile stateRegBits*)_SFR_MEM_ADDR(stateReg))->bit3
+#define adminAuth ((volatile stateRegBits*)_SFR_MEM_ADDR(stateReg))->bit2
+#define logOpened ((volatile stateRegBits*)_SFR_MEM_ADDR(stateReg))->bit1
+#define clearLogAction ((volatile stateRegBits*)_SFR_MEM_ADDR(stateReg))->bit0
 
 #define DEFAULT_STATE 0
 
@@ -111,6 +120,15 @@ void writeCurrentStateMessage() {
 		if (specialInputActive) {
 			lcd_clrscr();
 			lcd_puts("Enter an action");
+		} else if (logOpened || clearLogAction) {
+			if (adminAuth) {
+				lcd_clrscr();
+				lcd_gotoxy(13, 0);
+				lcd_puts("Log");
+			} else {
+				lcd_clrscr();
+				lcd_puts("Enter admin pass");
+			}
 		} else {
 			lcd_clrscr();
 			lcd_puts("Alarm off");
@@ -144,7 +162,7 @@ void refreshState() {
 }
 
 void handleKeypress(uint8_t key) {
-	if (key == KEY_HASH && ((alarmOn && !intruderDetected) || (!alarmOn && alarmTurningOn) || (alarmOn && intruderDetected))) {
+	if (key == KEY_HASH && (alarmOn || (!alarmOn && alarmTurningOn) || (!alarmOn && logOpened && !adminAuth) || (!alarmOn && clearLogAction && !adminAuth))) {
 		lcd_gotoxy(0, 1);
 		if (alarmOn && intruderDetected) {
 			lcd_puts("                ");
@@ -152,7 +170,7 @@ void handleKeypress(uint8_t key) {
 			lcd_puts("    ");
 		}
 		resetEnteredDigits;
-	} else if (isNumber(key) && ((alarmOn && !intruderDetected) || (!alarmOn && alarmTurningOn) || (alarmOn && intruderDetected))) {
+	} else if (isNumber(key) && (alarmOn || (!alarmOn && alarmTurningOn) || (!alarmOn && logOpened && !adminAuth) || (!alarmOn && clearLogAction && !adminAuth))) {
 		uint8_t i;
 		lcd_gotoxy(0, 1);
 		if (alarmOn && intruderDetected) {
@@ -173,10 +191,23 @@ void handleKeypress(uint8_t key) {
 		
 		if (i == PASSWORD_LENGTH - 1) {
 			if (enteredDigitsValue == password) {
-				alarmOn = 0;
-				motionDetected = 0;
-				intruderDetected = 0;
-				alarmTurningOn = 0;
+				if (alarmOn || alarmTurningOn) {
+					alarmOn = 0;
+					motionDetected = 0;
+					intruderDetected = 0;
+					alarmTurningOn = 0;
+				} else if (logOpened) {
+					adminAuth = 1;
+				} else if (clearLogAction) {
+					// TODO: clear log
+					
+					clearLogAction = 0;
+					
+					lcd_clrscr();
+					lcd_puts("Log cleared");
+					tripleBuzz();
+					_delay_ms(1000);
+				}
 				resetEnteredDigits;
 				refreshState();
 			} else {
@@ -188,9 +219,16 @@ void handleKeypress(uint8_t key) {
 				writeCurrentStateMessage();
 			}
 		}
+	} else if (logOpened) {
+		if (key == KEY_STAR) {
+			logOpened = 0;
+			adminAuth = 0;
+			refreshState();
+		}
 	} else if (!alarmOn) {
 		if (specialInputActive) {
 			if (key == 0) {
+				// Activate alarm
 				specialInputActive = 0;
 				if (motionDetected) {
 					lcd_clrscr();
@@ -204,7 +242,18 @@ void handleKeypress(uint8_t key) {
 					alarmTurningOn = 1;
 					refreshState();
 				}
-			} else if (key == KEY_STAR) {
+			} else if (key == 1) {
+				// Open log
+				logOpened = 1;
+				specialInputActive = 0;
+				refreshState();
+			} else if (key == 2) {
+				// Clear log
+				clearLogAction = 1;
+				specialInputActive = 0;
+				refreshState();
+			}else if (key == KEY_STAR) {
+				// Close special input screen
 				specialInputActive = 0;
 				refreshState();
 			}
