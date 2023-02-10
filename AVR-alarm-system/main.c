@@ -210,7 +210,8 @@ void lcdWriteEnteredDigits() {
 		if (enteredDigits[i] == KEY_NONE) {
 			break;
 		} else {
-			lcd_putc('0' + enteredDigits[i]);
+			//lcd_putc('0' + enteredDigits[i]);
+			lcd_putc('*');
 		}
 	}
 }
