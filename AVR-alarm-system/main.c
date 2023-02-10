@@ -57,8 +57,8 @@ volatile uint16_t tickCounter = 0;
 volatile uint8_t tickPendingActionFlag = 0;
 volatile uint8_t lcdCountdownValue = 0;
 
-#define MOTION_DETECTED_COUNTDOWN 600
-#define ALARM_TURN_ON_COUNTDOWN 600
+#define MOTION_DETECTED_COUNTDOWN 1000
+#define ALARM_TURN_ON_COUNTDOWN 1000
 #define TICKS_PER_ONE_SECOND 100
 
 void resetEnteredDigits() {
