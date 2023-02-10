@@ -4,12 +4,12 @@
 #include <avr/io.h>
 #include <avr/interrupt.h>
 #include <util/delay.h>
-#include <avr/eeprom.h>
 
 #include "lcd.h"
 #include "utils.h"
 #include "keypad.h"
 #include "door.h"
+#include "auth.h"
 
 
 /*
@@ -50,17 +50,6 @@ typedef struct {
 #define DEFAULT_STATE 0
 
 
-#define PASSWORD_LENGTH 4
-#define PASSWORD_USERS_COUNT 4
-
-uint8_t adminPassword[4] = {1, 2, 3, 4};
-uint8_t userPasswords[4][4] = {
-	{1, 1, 1, 1}, // user 1
-	{2, 2, 2, 2}, // user 2
-	{3, 3, 3, 3}, // user 3
-	{4, 4, 4, 4}, // user 4
-};
-
 uint8_t enteredDigits[4] = {KEY_NONE, KEY_NONE, KEY_NONE, KEY_NONE};
 
 uint16_t tickCounter = 0;
@@ -70,61 +59,9 @@ uint16_t tickCounter = 0;
 #define ALARM_TURN_ON_COUNTDOWN 3000
 #define TICKS_PER_ONE_SECOND 500
 
-uint8_t logSize = 0;
-uint8_t logIndex = 0;
-
-#define LOG_SIZE_ADDRESS 1
-#define LOG_FIRST_ADDRESS 2
-
 void resetEnteredDigits() {
 	enteredDigits[0] = enteredDigits[1] = enteredDigits[2] = enteredDigits[3] = KEY_NONE;
 }
-
-uint8_t checkEnteredPassword(uint8_t *pass) {
-	for (uint8_t j = 0; j < PASSWORD_LENGTH; j++) {
-		if (enteredDigits[j] != pass[j]) {
-			return 0;
-		} else if (j == PASSWORD_LENGTH-1) {
-			return 1;
-		}
-	}
-	return 0;
-}
-
-uint8_t getUserIdForEnteredPassword() {
-	for (uint8_t i = 0; i < PASSWORD_USERS_COUNT; i++) {
-		if (checkEnteredPassword(userPasswords[i])) {
-			return i + 1;
-		}
-	}
-	return 0;
-}
-
-void writeLoginToLog(uint8_t userId) {
-	eeprom_update_byte(( uint8_t *) LOG_FIRST_ADDRESS + logSize, userId);
-	logSize++;
-	eeprom_update_byte (( uint8_t *) LOG_SIZE_ADDRESS, logSize);
-}
-
-void clearLog() {
-	logSize = 0;
-	logIndex = 0;
-	eeprom_update_byte (( uint8_t *) LOG_SIZE_ADDRESS, 0);
-}
-
-uint8_t getUserIdFromLog(uint8_t index) {
-	return eeprom_read_byte((const uint8_t*) LOG_FIRST_ADDRESS + index);
-}
-
-void writeLogUserToLcd(uint8_t userId) {
-	if (userId == 0) {
-		lcd_puts("Admin");
-	} else {
-		lcd_puts("User ");
-		writeLCD(userId);
-	}
-}
-
 
 void initLcd() {
 	lcd_init(LCD_DISP_ON);
@@ -139,9 +76,13 @@ void initLcd() {
 	_delay_ms(200);
 }
 
-void initLog() {
-	logSize = eeprom_read_byte ((const uint8_t*) LOG_SIZE_ADDRESS);
-	logIndex = 0;
+void writeLogUserToLcd(uint8_t userId) {
+	if (userId == 0) {
+		lcd_puts("Admin");
+	} else {
+		lcd_puts("User ");
+		writeLCD(userId);
+	}
 }
 
 void LCDwriteEnteredDigits() {
@@ -157,6 +98,37 @@ void LCDwriteEnteredDigits() {
 void LcdWriteTickCountdown() {
 	lcd_gotoxy(14, 1);
 	writeLCD_alignRight(tickCounter / TICKS_PER_ONE_SECOND, 2);
+}
+
+void lcdWriteLog() {
+	lcd_clrscr();
+	lcd_gotoxy(13, 0);
+	lcd_puts("Log");
+	
+	uint8_t page = (logIndex >> 1) + 1;
+	uint8_t pagesCount = (logSize + 1) >> 1;
+	
+	if (pagesCount < 10) {
+		lcd_gotoxy(12, 1);
+		} else {
+		lcd_gotoxy(11, 1);
+	}
+	writeLCD_alignRight(page, 2);
+	lcd_putc('/');
+	writeLCD(pagesCount);
+	
+	if (logIndex < logSize) {
+		lcd_gotoxy(0, 0);
+		writeLCD(logIndex+1);
+		lcd_puts(". ");
+		writeLogUserToLcd(getUserIdFromLog(logIndex));
+	}
+	if (logIndex+1 < logSize) {
+		lcd_gotoxy(0, 1);
+		writeLCD(logIndex+2);
+		lcd_puts(". ");
+		writeLogUserToLcd(getUserIdFromLog(logIndex+1));
+	}
 }
 
 void writeCurrentStateMessage() {
@@ -188,34 +160,7 @@ void writeCurrentStateMessage() {
 			lcd_puts("Enter an action");
 		} else if (logOpened || clearLogAction) {
 			if (adminAuth) {
-				lcd_clrscr();
-				lcd_gotoxy(13, 0);
-				lcd_puts("Log");
-				
-				uint8_t page = (logIndex >> 1) + 1;
-				uint8_t pagesCount = (logSize + 1) >> 1;
-				
-				if (pagesCount < 10) {
-					lcd_gotoxy(12, 1);
-				} else {
-					lcd_gotoxy(11, 1);
-				}
-				writeLCD_alignRight(page, 2);
-				lcd_putc('/');
-				writeLCD(pagesCount);
-				
-				if (logIndex < logSize) {
-					lcd_gotoxy(0, 0);
-					writeLCD(logIndex+1);
-					lcd_puts(". ");
-					writeLogUserToLcd(getUserIdFromLog(logIndex));
-				}
-				if (logIndex+1 < logSize) {
-					lcd_gotoxy(0, 1);
-					writeLCD(logIndex+2);
-					lcd_puts(". ");
-					writeLogUserToLcd(getUserIdFromLog(logIndex+1));
-				}
+				lcdWriteLog();
 			} else {
 				lcd_clrscr();
 				lcd_puts("Enter admin pass");
@@ -285,8 +230,8 @@ void handleKeypress(uint8_t key) {
 		}
 		
 		if (i == PASSWORD_LENGTH - 1) {
-			uint8_t isAdmin = checkEnteredPassword(adminPassword);
-			uint8_t user = getUserIdForEnteredPassword();
+			uint8_t isAdmin = checkEnteredPassword(enteredDigits, adminPassword);
+			uint8_t user = getUserIdForEnteredPassword(enteredDigits);
 			if (isAdmin || user) {
 				if (alarmOn || alarmTurningOn) {
 					alarmOn = 0;
