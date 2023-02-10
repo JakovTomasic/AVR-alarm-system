@@ -1,9 +1,15 @@
-
 #include <avr/io.h>
 #include <avr/eeprom.h>
 
 #include "auth.h"
 
+uint8_t adminPassword[4] = {1, 2, 3, 4};
+uint8_t userPasswords[4][4] = {
+	{1, 1, 1, 1}, // user 1
+	{2, 2, 2, 2}, // user 2
+	{3, 3, 3, 3}, // user 3
+	{4, 4, 4, 4}, // user 4
+};
 
 uint8_t checkEnteredPassword(uint8_t *entered, uint8_t *toCheck) {
 	for (uint8_t j = 0; j < PASSWORD_LENGTH; j++) {

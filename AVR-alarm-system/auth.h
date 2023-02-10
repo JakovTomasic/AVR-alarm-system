@@ -7,16 +7,11 @@
 #define PASSWORD_LENGTH 4
 #define PASSWORD_USERS_COUNT 4
 
-static uint8_t adminPassword[4] = {1, 2, 3, 4};
-static uint8_t userPasswords[4][4] = {
-	{1, 1, 1, 1}, // user 1
-	{2, 2, 2, 2}, // user 2
-	{3, 3, 3, 3}, // user 3
-	{4, 4, 4, 4}, // user 4
-};
+extern uint8_t adminPassword[4];
+extern uint8_t userPasswords[4][4];
 
-static uint8_t logSize = 0;
-static uint8_t logIndex = 0;
+uint8_t logSize;
+uint8_t logIndex;
 
 
 extern uint8_t checkEnteredPassword(uint8_t *entered, uint8_t *toCheck);
