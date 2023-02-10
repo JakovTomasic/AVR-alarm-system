@@ -430,7 +430,7 @@ void handleKeypress(uint8_t key) {
 			adminAuth = 0;
 			refreshState();
 		}
-	} else if (!alarmOn) {
+	} else if (!alarmOn && !alarmTurningOn) {
 		if (specialInputActive) {
 			if (key == 0) {
 				// Activate alarm
